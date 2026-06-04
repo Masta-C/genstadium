@@ -1,0 +1,108 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "Searchable index of key decisions. Read this instead of loading all ADRs. Load the full ADR only if you need full rationale.",
+    "updated": "2026-06-04"
+  },
+  "nodes": [
+    {
+      "id": "iso-camera",
+      "type": "decision",
+      "summary": "Director designates one camera slot as ISO Camera during Camera Slots setup. Egress B records only that slot's track (not all cameras). Default: cam_1.",
+      "detail": "Replaces original 'record all tracks' design. Saves ~75% Track Egress cost. Director picks in Camera Slots screen via 📹 Replay Source radio toggle.",
+      "decided": "2026-06-04",
+      "adr": "docs/adr/007-egress-a-b-architecture.md",
+      "field": "session.replayCameraSlot",
+      "issues": ["#53", "#61", "#67", "#69", "#73", "#94"]
+    },
+    {
+      "id": "slot-identity",
+      "type": "decision",
+      "summary": "Camera participant identity in LiveKit = slot name (e.g. 'cam_1'). Set at token generation by Cloud Run. No mapping layer needed — slot = identity = GCS path segment.",
+      "decided": "2026-06-04",
+      "adr": "docs/adr/007-egress-a-b-architecture.md",
+      "issues": ["#59", "#61", "#73"]
+    },
+    {
+      "id": "clip-duration",
+      "type": "decision",
+      "summary": "Replay clips are always 20 seconds. Fixed for all events and all sports. Not configurable per event in eventConfig.",
+      "decided": "2026-06-04",
+      "adr": "docs/adr/006-speculative-prefetch-gcs.md",
+      "issues": ["#76"]
+    },
+    {
+      "id": "single-replay-badge",
+      "type": "decision",
+      "summary": "Director sees one 'Replay Ready 🎬' badge at a time. Most recent pre-fetched clip overwrites previous. No queue, no event label on badge.",
+      "decided": "2026-06-04",
+      "adr": "docs/adr/006-speculative-prefetch-gcs.md",
+      "firestore_field": "sessions/{id}.latestReplayClip",
+      "issues": ["#78"]
+    },
+    {
+      "id": "prefetch-abort-gap",
+      "type": "decision",
+      "summary": "If ISO Camera was offline during event window (most recent DVR segment > 10s before eventTimestamp), pre-fetch is silently aborted. No partial clips ever.",
+      "decided": "2026-06-04",
+      "adr": "docs/adr/006-speculative-prefetch-gcs.md",
+      "issues": ["#75", "#76"]
+    },
+    {
+      "id": "go-live-iso-gate",
+      "type": "decision",
+      "summary": "Go Live is blocked until ISO Camera slot participant is in the LiveKit Room. Hard gate — not a warning. Lobby screen disables Go Live button until ISO Camera joins.",
+      "decided": "2026-06-04",
+      "adr": "docs/adr/007-egress-a-b-architecture.md",
+      "issues": ["#20", "#67", "#69"]
+    },
+    {
+      "id": "slot-picker-ux",
+      "type": "decision",
+      "summary": "Cameras join via single join code then pick a slot. Slot picker shows Director's labels (e.g. 'Wide Angle') + slot code. Taken slots grey out in real-time via Firestore onSnapshot.",
+      "decided": "2026-06-04",
+      "adr": "docs/adr/007-egress-a-b-architecture.md",
+      "issues": ["#61"]
+    },
+    {
+      "id": "score-keeper-flow",
+      "type": "decision",
+      "summary": "9 steps: Guest Landing → Guest Join → Team Setup → Roster Setup → Who Goes First → Ready → Live Scoring (landscape) → Event Log → Session Ended + Scorecard.",
+      "decided": "2026-06-04",
+      "source": "CLAUDE.md",
+      "issues": ["#21", "#22", "#23", "#24", "#25", "#26", "#27", "#39"]
+    },
+    {
+      "id": "camera-flow",
+      "type": "decision",
+      "summary": "5 steps: Guest Landing → Guest Join → Pick Slot → Camera Live → Session Ended.",
+      "decided": "2026-06-04",
+      "source": "CLAUDE.md",
+      "issues": ["#21", "#60", "#61", "#62", "#63"]
+    },
+    {
+      "id": "session-type",
+      "type": "decision",
+      "summary": "Sessions have sessionType: 'tier0' | 'tier1'. Tier 0 = Score Keeper + scorebug only (no LiveKit). Tier 1 = full production. Field gates which setup screens appear and which Cloud Run endpoints are available.",
+      "decided": "2026-06-04",
+      "source": "GitHub issue #18 comment",
+      "issues": ["#18"]
+    },
+    {
+      "id": "single-cloud-function",
+      "type": "decision",
+      "summary": "One Cloud Function handles score aggregation + pre-fetch trigger + animation trigger. Not three separate functions. Avoids race conditions and double triggers on score events.",
+      "decided": "2026-06-04",
+      "source": "GitHub issue #31 comment",
+      "issues": ["#31", "#75", "#91"]
+    },
+    {
+      "id": "eventconfig-naming",
+      "type": "decision",
+      "summary": "Always eventConfig, never sportConfig. eventConfig[sport].events[n].triggers controls pre-fetch and animation. events with triggers:['prefetch'] kick off ISO Camera DVR encode.",
+      "decided": "2026-05-31",
+      "adr": "docs/adr/008-eventconfig-extensible-model.md",
+      "issues": ["#17"]
+    }
+  ]
+}
