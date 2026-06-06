@@ -1,0 +1,25 @@
+# Firebase credentials — never commit these
+app/google-services.json
+app/GoogleService-Info.plist
+
+# Service account keys
+*.json.key
+service-account*.json
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+
+# Expo
+app/.expo/
+app/android/app/build/
+app/ios/build/
