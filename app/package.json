@@ -12,6 +12,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@genstadium/event-config": "*",
     "expo": "~52.0.0",
     "expo-router": "~4.0.0",
     "expo-screen-orientation": "~8.0.0",
