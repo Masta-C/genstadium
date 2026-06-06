@@ -2,7 +2,7 @@
   "name": "genstadium",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["app", "cloud-run", "graphics"],
+  "workspaces": ["app", "cloud-run", "graphics", "packages/*"],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"

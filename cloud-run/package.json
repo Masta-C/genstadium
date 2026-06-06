@@ -12,6 +12,7 @@
     "test:rules": "jest --config jest.rules.config.js"
   },
   "dependencies": {
+    "@genstadium/event-config": "*",
     "express": "^4.19.0",
     "firebase-admin": "^12.0.0",
     "jose": "^5.9.0",
