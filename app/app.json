@@ -30,7 +30,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-screen-orientation"
+      "expo-screen-orientation",
+      "expo-clipboard"
     ],
     "experiments": {
       "typedRoutes": true
