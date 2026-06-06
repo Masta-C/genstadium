@@ -1,0 +1,13 @@
+{
+  "name": "genstadium",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["app", "cloud-run", "graphics"],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.0"
+  }
+}
