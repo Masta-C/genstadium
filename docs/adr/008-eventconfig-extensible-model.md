@@ -85,6 +85,38 @@ type EventDefinition = {
 }
 ```
 
+## Animation Template System
+
+Event animations are sport-agnostic. Templates are motion design shells with dynamic data slots. Users pick a template per event type during session setup — no design skill required.
+
+**6 templates (Phase 1):**
+
+| Template | Slot data used | Use cases |
+|---|---|---|
+| Score Flash | eventLabel, teamColour, score | Goal, Six, Basket, Point |
+| Player Card | eventLabel, playerName, teamColour | Wicket, Assist, Top scorer |
+| Alert Banner | eventLabel, teamName, teamColour | Red card, Foul, Penalty, Timeout |
+| Milestone Burst | eventLabel, playerName, milestone text | Century, Hat-trick, Record |
+| Replay Intro | cameraLabel | Overlays every replay clip, sport-agnostic |
+| Stat Card | two-column key/value pairs | Half-time stats, bowling figures, election update |
+
+**EventDefinition updated schema:**
+```typescript
+type EventDefinition = {
+  id: string
+  label: string
+  scoreDelta: { team: number } | null
+  metadata: MetadataField[]
+  triggers: ('prefetch' | 'animation')[]
+  animationTemplate?: 'score-flash' | 'player-card' | 'alert-banner' | 'milestone-burst' | 'replay-intro' | 'stat-card'
+}
+```
+
+`animationTemplate` is optional — events without it skip the animation step. User selects template per event during Create Session. Template picker shows live preview with placeholder data before match starts.
+
+**Phase 3:** Custom Lottie upload — user uploads `.json` Lottie file → GCS → appears as "Custom" in template picker.
+**Phase 4:** Community template marketplace — same slot interface, no hardcoded sport logic.
+
 ## Consequences
 
 **Positive:**

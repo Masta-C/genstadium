@@ -23,16 +23,19 @@ The web page rendered inside LiveKit Egress headless Chrome. URL: `https://graph
 The LiveKit Egress job that composites the active camera feed + Scorebug overlay and streams to YouTube via RTMPS. One Egress A per Session. Started by Cloud Run on Go Live.
 
 ### Egress B
-The LiveKit Egress job that records individual camera tracks to GCS as HLS segments. Creates the DVR buffer. One Egress B per Session. Started simultaneously with Egress A.
+The LiveKit Egress job that records the ISO Camera track to GCS as HLS segments. Creates the DVR buffer. One Egress B per Session. Records only the ISO Camera — not all camera tracks. Started simultaneously with Egress A.
+
+### ISO Camera
+The single camera slot designated by the Director as the dedicated replay source. Set during Camera Slots setup. Egress B records only this camera's track. Typically the wide-angle, static camera — chosen by the Director at session setup time, not dynamically at replay time. Stored as `session.replayCameraSlot` (e.g. `"cam_1"`). Defaults to `cam_1` if Director does not designate one.
 
 ### DVR Buffer
-The rolling window of recorded camera footage stored in GCS as 4-second HLS segments. Code enforces a 120-second window — only segments from the last 120 seconds are used for replay. GCS lifecycle is 1 day (safety net). Lives at `gs://{bucket}/dvr/{sessionId}/{cameraId}/`.
+The rolling window of ISO Camera footage stored in GCS as 4-second HLS segments. Code enforces a 120-second window — only segments from the last 120 seconds are used for replay. GCS lifecycle is 1 day (safety net). Lives at `gs://{bucket}/dvr/{sessionId}/{isoSlot}/`.
 
 ### Speculative Pre-fetch
-The pattern where a Score Keeper event (e.g. a goal) immediately triggers Cloud Run to start encoding a replay clip from the DVR buffer — before the Director has requested it. The encoded clip is written to GCS at `gs://{bucket}/prefetched/{sessionId}/{cameraId}/{eventTimestamp}.mp4`. Eliminates replay latency from the Director's perspective.
+The pattern where a Score Keeper event with `triggers: ["prefetch"]` (e.g. goal, wicket, six) silently triggers Cloud Run to encode the last 20 seconds of the ISO Camera DVR buffer and write it to GCS — before the Director has requested it. The Score Keeper is unaware. The Director sees a "Replay Ready 🎬" indicator when the clip is ready. The clip is simply the 20 seconds of ISO Camera footage ending at the moment the event was logged — the system does not interpret what happened in the footage.
 
 ### Replay Clip
-A short MP4 video segment (typically 10-30 seconds) encoded from the DVR buffer after a significant event. Created by Cloud Run FFmpeg. Injected into the LiveKit Room via Ingress as a participant named `replay-clip-{n}`.
+A 20-second MP4 video segment encoded from the ISO Camera's DVR buffer immediately after a significant event. Created by Cloud Run FFmpeg. Injected into the LiveKit Room via Ingress as a participant named `replay-clip-{n}`.
 
 ### LiveKit Ingress
 A LiveKit feature that injects an external media source (MP4 via signed GCS URL) into a Room as a participant. Used for both Replay Clips and Ad Clips. The Director switches to the Ingress participant the same way they switch between cameras.
@@ -53,7 +56,7 @@ An entry written by the Score Keeper to `sessions/{sessionId}/events/{eventId}`.
 The aggregated score document at `sessions/{sessionId}/scoreState`. Written ONLY by Cloud Function (never by client). Contains `homeScore`, `awayScore`, `period`, `lastEvent`.
 
 ### Go Live
-The Host action that starts the broadcast. Triggers: credit check → idempotent Egress A + B start → session status → `live`. Idempotent — safe to retry.
+The Director action that starts the broadcast. Requires: ISO Camera present in Room (hard gate — Lobby blocks until confirmed). Triggers: credit check → idempotent Egress A + B start → session status → `live`. Idempotent — safe to retry.
 
 ### Credit Balance
 The number of events (sessions) a Host account is entitled to broadcast. Stored at `users/{uid}/credits.balance`. Written ONLY by Stripe/StoreKit webhook Cloud Function. Read by Cloud Run before every Go Live.
@@ -75,7 +78,7 @@ Creates and manages Sessions. Initiates Go Live. Purchases credits. Manages stre
 Controls the live broadcast. Switches between camera sources. Triggers replays and ads. Controls Scorebug visibility. Physically present at the venue. No video preview of cameras (they can see the real action). Uses email auth.
 
 ### Camera
-Joins a Session via Join Code. Publishes their phone camera as a LiveKit track. No app UI complexity — point and stream. Uses anonymous auth.
+Joins a Session via Join Code. Picks an available camera slot from a list (taken slots are greyed out in real-time). Publishes their phone camera as a LiveKit track using the slot name as their participant identity. No app UI complexity — point and stream. Uses anonymous auth. Director and Camera operators agree on slot assignments verbally before setup.
 
 ### Score Keeper
 Joins a Session via Join Code. Logs Score Events using the eventConfig-defined event list. Does not see the stream. Uses anonymous auth.
@@ -94,7 +97,7 @@ A LiveKit concept. One Room = one Session. Room name = sessionId. Participants: 
 LiveKit Egress type that mixes all Room participants + a custom layout URL into a single video stream. Used for Egress A.
 
 ### Track Egress
-LiveKit Egress type that records individual participant tracks separately. Used for Egress B (DVR).
+LiveKit Egress type that records a specific participant track to GCS. Used for Egress B (DVR). Targets the ISO Camera by `participantIdentity` — which equals the slot name, so no mapping layer is needed.
 
 ### RTMPS
 The encrypted RTMP protocol used for YouTube live streaming. `rtmps://a.rtmp.youtube.com/live2/{streamKey}`.
@@ -104,6 +107,43 @@ LiveKit Egress lifecycle: `STARTING → ACTIVE → ENDING → ENDED`. Cloud Run 
 
 ### JWKS
 JSON Web Key Set — Google's public keys used to verify Firebase ID tokens in Cloud Run. Fetched from `https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com`. Always set `timeoutDuration: 10_000` on `createRemoteJWKSet` to avoid cold start hangs.
+
+---
+
+## Score Keeper Terms
+
+### Attribution Sheet
+The bottom sheet that slides up for 8 seconds after a scoring event. Prompts the Score Keeper to identify the player responsible. Score is already registered on the board — the sheet is soft mandatory only. Auto-closes after 8 seconds and logs the event as "Unknown".
+
+### T1 Button
+Primary scoring button in the Score Keeper live screen. Large touch target (~56px). Triggers score change and score flash animation. Examples: Goal, +3, +2, SIX, FOUR, TD.
+
+### T2 Button
+Discipline event button. Medium size. Triggers a broadcast animation (lower third). Does not change score. Examples: Yellow Card, Red Card, Wicket, Foul.
+
+### T3 Button
+Admin and stats button. Small, 3–4 per row. Triggers no animation. Hold 300ms to see full name tooltip. Examples: Corner, Sub, Wide, No Ball, End Innings.
+
+### On-Strike Toggle
+Cricket-only UI element in the team header showing both batsmen. The active (on-strike) batsman is highlighted green. Auto-rotates on 1 or 3 runs. Score Keeper can tap to manually override.
+
+### Innings Flip
+The manual action in cricket where the Score Keeper ends the current innings and begins the next. Triggered via the T3 "END INN" button. Resets over counter and on-strike state for the new innings.
+
+### Over Complete
+The modal that appears in cricket after 6 legal balls have been bowled. Prompts the Score Keeper to select the next bowler before play continues. Ball counter and over number reset after selection.
+
+### Guest Landing Screen
+The shared screen shown to anyone joining via join code before they select their role. Shows session name, sport, and team names. Role picker: Camera Operator or Score Keeper. Step 1 of both the Camera and Score Keeper journeys.
+
+### Soft Mandatory Attribution
+The attribution pattern where a score event registers on the board and broadcast instantly, but the Attribution Sheet prompts for player identity for 8 seconds. Expires to "Unknown" — never blocks the score. Ensures match data quality without disrupting play flow.
+
+### Replay Ready
+The single 🎬 indicator on the Director's live screen signalling that a pre-fetched 20-second clip is available for broadcast. Appears after a Score Event with `triggers: ["prefetch"]` is processed. Only one badge at a time — most recent clip overwrites the previous. Disappears after Director broadcasts the clip or ISO Camera goes offline.
+
+### Scorebug Style
+The Director's one-time choice of overlay format made during session setup. Either **Scorebug** (persistent score display in corner of stream) or **Event Lower Third** (animated lower-third bar that fires on significant events). Cannot be changed after Go Live.
 
 ---
 
@@ -120,3 +160,5 @@ JSON Web Key Set — Google's public keys used to verify Firebase ID tokens in C
 | "hold clip in Cloud Run memory" | Always write to GCS immediately after FFmpeg encode |
 | "renderMedia() in browser" | renderMedia() is Cloud Run only |
 | "sportConfig.scoreDelta" | `eventConfig[sport].events[n].scoreDelta` |
+| "record all camera tracks" | Record only the ISO Camera track (Egress B = one Track Egress job) |
+| "active camera for replay" | ISO Camera — designated at setup, not determined by Director state at event time |

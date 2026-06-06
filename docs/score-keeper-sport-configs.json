@@ -1,0 +1,189 @@
+{
+  "_meta": {
+    "purpose": "Defines the Score Keeper UI layout for each sport. Each config drives event buttons, period structure, foul tracking, and score display. Maps directly to eventConfig in CLAUDE.md.",
+    "screenRequirements": "All screens: team 1 left / team 2 right split, quick-tap event buttons, period/half duration display, foul count per team, validation for foul limits."
+  },
+
+  "soccer": {
+    "displayName": "Soccer / Football",
+    "icon": "⚽",
+    "scoreUnit": "goals",
+    "periods": ["1st Half", "2nd Half", "Extra Time 1", "Extra Time 2"],
+    "periodDuration": 45,
+    "periodDurationUnit": "min",
+    "fouls": {
+      "trackPerTeam": true,
+      "warningThreshold": 3,
+      "label": "Fouls",
+      "resetOnPeriod": true
+    },
+    "cards": {
+      "yellow": { "label": "Yellow Card", "limit": 2, "secondYellowIsRed": true },
+      "red":    { "label": "Red Card",    "limit": 1, "removesPlayer": true }
+    },
+    "events": [
+      { "id": "goal",           "label": "Goal",         "icon": "⚽", "scoreDelta": 1,  "size": "large",  "colour": "primary",  "triggers": ["animation", "prefetch"] },
+      { "id": "own_goal",       "label": "Own Goal",     "icon": "⚽", "scoreDelta": -1, "size": "medium", "colour": "danger",   "triggers": ["animation"] },
+      { "id": "yellow_card",    "label": "Yellow Card",  "icon": "🟨", "scoreDelta": 0,  "size": "medium", "colour": "warning",  "triggers": ["animation"], "addsFoul": true },
+      { "id": "red_card",       "label": "Red Card",     "icon": "🟥", "scoreDelta": 0,  "size": "medium", "colour": "danger",   "triggers": ["animation"], "addsFoul": true },
+      { "id": "penalty",        "label": "Penalty",      "icon": "🎯", "scoreDelta": 0,  "size": "medium", "colour": "warning",  "triggers": [] },
+      { "id": "corner",         "label": "Corner",       "icon": "🚩", "scoreDelta": 0,  "size": "small",  "colour": "neutral",  "triggers": [] },
+      { "id": "offside",        "label": "Offside",      "icon": "🚫", "scoreDelta": 0,  "size": "small",  "colour": "neutral",  "triggers": [] },
+      { "id": "substitution",   "label": "Sub",          "icon": "🔄", "scoreDelta": 0,  "size": "small",  "colour": "info",     "triggers": [] }
+    ],
+    "scorebugLayout": "soccer",
+    "animationTemplate": { "goal": "score-flash", "yellow_card": "alert-banner", "red_card": "alert-banner" }
+  },
+
+  "cricket": {
+    "displayName": "Cricket",
+    "icon": "🏏",
+    "scoreUnit": "runs",
+    "periods": ["1st Innings", "2nd Innings"],
+    "periodDuration": null,
+    "periodDurationUnit": "overs",
+    "fouls": {
+      "trackPerTeam": false,
+      "label": null
+    },
+    "extras": {
+      "track": true,
+      "types": ["Wide", "No Ball", "Bye", "Leg Bye"]
+    },
+    "events": [
+      { "id": "runs_1",   "label": "1 Run",   "icon": "1️⃣", "scoreDelta": 1,  "size": "medium", "colour": "neutral",  "triggers": [] },
+      { "id": "runs_2",   "label": "2 Runs",  "icon": "2️⃣", "scoreDelta": 2,  "size": "medium", "colour": "neutral",  "triggers": [] },
+      { "id": "runs_3",   "label": "3 Runs",  "icon": "3️⃣", "scoreDelta": 3,  "size": "medium", "colour": "neutral",  "triggers": [] },
+      { "id": "four",     "label": "FOUR",    "icon": "4️⃣", "scoreDelta": 4,  "size": "large",  "colour": "primary",  "triggers": ["animation", "prefetch"] },
+      { "id": "six",      "label": "SIX",     "icon": "6️⃣", "scoreDelta": 6,  "size": "large",  "colour": "primary",  "triggers": ["animation", "prefetch"] },
+      { "id": "wicket",   "label": "Wicket",  "icon": "🎯", "scoreDelta": 0,  "size": "large",  "colour": "danger",   "triggers": ["animation", "prefetch"], "metadata": ["bowler", "dismissalType"] },
+      { "id": "wide",     "label": "Wide",    "icon": "↔️", "scoreDelta": 1,  "size": "small",  "colour": "warning",  "triggers": [], "isExtra": true },
+      { "id": "no_ball",  "label": "No Ball", "icon": "⛔", "scoreDelta": 1,  "size": "small",  "colour": "warning",  "triggers": [], "isExtra": true },
+      { "id": "dot_ball", "label": "Dot",     "icon": "⚫", "scoreDelta": 0,  "size": "small",  "colour": "neutral",  "triggers": [] }
+    ],
+    "additionalDisplay": ["overs", "wickets", "runRate", "extras"],
+    "scorebugLayout": "cricket",
+    "animationTemplate": { "six": "score-flash", "four": "score-flash", "wicket": "player-card" }
+  },
+
+  "basketball": {
+    "displayName": "Basketball",
+    "icon": "🏀",
+    "scoreUnit": "points",
+    "periods": ["Q1", "Q2", "Q3", "Q4", "OT"],
+    "periodDuration": 10,
+    "periodDurationUnit": "min",
+    "fouls": {
+      "trackPerTeam": true,
+      "perPlayerLimit": 5,
+      "teamBonusThreshold": 5,
+      "label": "Team Fouls",
+      "resetOnPeriod": true
+    },
+    "timeouts": {
+      "perTeamPerHalf": 2,
+      "trackRemaining": true
+    },
+    "events": [
+      { "id": "points_1",  "label": "1 Pt",   "icon": "🎯", "scoreDelta": 1, "size": "large",  "colour": "primary",  "triggers": [] },
+      { "id": "points_2",  "label": "2 Pts",  "icon": "🏀", "scoreDelta": 2, "size": "large",  "colour": "primary",  "triggers": ["animation", "prefetch"] },
+      { "id": "points_3",  "label": "3 Pts",  "icon": "🌟", "scoreDelta": 3, "size": "large",  "colour": "primary",  "triggers": ["animation", "prefetch"] },
+      { "id": "foul",      "label": "Foul",   "icon": "✋", "scoreDelta": 0, "size": "medium", "colour": "warning",  "triggers": ["animation"], "addsFoul": true, "metadata": ["playerNumber"] },
+      { "id": "timeout",   "label": "Timeout","icon": "⏸️", "scoreDelta": 0, "size": "small",  "colour": "info",     "triggers": [], "removesTimeout": true },
+      { "id": "block",     "label": "Block",  "icon": "🚫", "scoreDelta": 0, "size": "small",  "colour": "neutral",  "triggers": [] },
+      { "id": "steal",     "label": "Steal",  "icon": "💨", "scoreDelta": 0, "size": "small",  "colour": "neutral",  "triggers": [] }
+    ],
+    "scorebugLayout": "basketball",
+    "animationTemplate": { "points_3": "milestone-burst", "points_2": "score-flash", "foul": "alert-banner" }
+  },
+
+  "american_football": {
+    "displayName": "American Football",
+    "icon": "🏈",
+    "scoreUnit": "points",
+    "periods": ["Q1", "Q2", "Q3", "Q4", "OT"],
+    "periodDuration": 15,
+    "periodDurationUnit": "min",
+    "fouls": {
+      "trackPerTeam": true,
+      "label": "Penalties",
+      "resetOnPeriod": false
+    },
+    "downs": {
+      "track": true,
+      "label": "Down & Distance"
+    },
+    "events": [
+      { "id": "touchdown",  "label": "Touchdown",   "icon": "🏈", "scoreDelta": 6, "size": "large",  "colour": "primary",  "triggers": ["animation", "prefetch"] },
+      { "id": "extra_pt",   "label": "Extra Point", "icon": "🎯", "scoreDelta": 1, "size": "medium", "colour": "primary",  "triggers": [] },
+      { "id": "two_pt",     "label": "2-Point",     "icon": "✌️", "scoreDelta": 2, "size": "medium", "colour": "primary",  "triggers": [] },
+      { "id": "field_goal", "label": "Field Goal",  "icon": "🥅", "scoreDelta": 3, "size": "large",  "colour": "primary",  "triggers": ["animation", "prefetch"] },
+      { "id": "safety",     "label": "Safety",      "icon": "⬛", "scoreDelta": 2, "size": "medium", "colour": "warning",  "triggers": ["animation"] },
+      { "id": "penalty",    "label": "Penalty",     "icon": "🚩", "scoreDelta": 0, "size": "small",  "colour": "danger",   "triggers": [], "addsFoul": true },
+      { "id": "timeout",    "label": "Timeout",     "icon": "⏸️", "scoreDelta": 0, "size": "small",  "colour": "info",     "triggers": [], "removesTimeout": true }
+    ],
+    "scorebugLayout": "american_football",
+    "animationTemplate": { "touchdown": "score-flash", "field_goal": "score-flash", "penalty": "alert-banner" }
+  },
+
+  "pickleball": {
+    "displayName": "Pickleball",
+    "icon": "🏓",
+    "scoreUnit": "points",
+    "format": "best_of_3_or_5",
+    "periods": ["Game 1", "Game 2", "Game 3", "Game 4", "Game 5"],
+    "gameWinScore": 11,
+    "gameWinBy": 2,
+    "fouls": {
+      "trackPerTeam": false,
+      "faults": {
+        "track": true,
+        "label": "Faults"
+      }
+    },
+    "serving": {
+      "track": true,
+      "label": "Serving"
+    },
+    "events": [
+      { "id": "point_server",   "label": "Point (Serving)",   "icon": "✅", "scoreDelta": 1, "size": "large",  "colour": "primary",  "triggers": [] },
+      { "id": "side_out",       "label": "Side Out",          "icon": "🔄", "scoreDelta": 0, "size": "large",  "colour": "warning",  "triggers": [] },
+      { "id": "fault",          "label": "Fault",             "icon": "❌", "scoreDelta": 0, "size": "medium", "colour": "danger",   "triggers": [], "addsFault": true },
+      { "id": "kitchen_fault",  "label": "Kitchen Fault",     "icon": "🚫", "scoreDelta": 0, "size": "medium", "colour": "danger",   "triggers": [], "addsFault": true },
+      { "id": "timeout",        "label": "Timeout",           "icon": "⏸️", "scoreDelta": 0, "size": "small",  "colour": "info",     "triggers": [], "removesTimeout": true }
+    ],
+    "scorebugLayout": "pickleball",
+    "animationTemplate": { "point_server": "score-flash", "side_out": "alert-banner" }
+  },
+
+  "badminton": {
+    "displayName": "Badminton",
+    "icon": "🏸",
+    "scoreUnit": "points",
+    "format": "best_of_3",
+    "periods": ["Game 1", "Game 2", "Game 3"],
+    "gameWinScore": 21,
+    "gameWinBy": 2,
+    "intervalAt": 11,
+    "fouls": {
+      "trackPerTeam": false,
+      "faults": {
+        "track": true,
+        "label": "Faults"
+      }
+    },
+    "serving": {
+      "track": true,
+      "label": "Service"
+    },
+    "events": [
+      { "id": "point",          "label": "Point",      "icon": "✅", "scoreDelta": 1, "size": "large",  "colour": "primary",  "triggers": [] },
+      { "id": "fault",          "label": "Fault",      "icon": "❌", "scoreDelta": 0, "size": "medium", "colour": "danger",   "triggers": [], "addsFault": true },
+      { "id": "net_fault",      "label": "Net Fault",  "icon": "🕸️", "scoreDelta": 0, "size": "medium", "colour": "danger",   "triggers": [], "addsFault": true },
+      { "id": "service_fault",  "label": "Svc Fault",  "icon": "🚫", "scoreDelta": 0, "size": "small",  "colour": "warning",  "triggers": [], "addsFault": true },
+      { "id": "let",            "label": "Let",        "icon": "↩️", "scoreDelta": 0, "size": "small",  "colour": "neutral",  "triggers": [] }
+    ],
+    "scorebugLayout": "badminton",
+    "animationTemplate": { "point": "score-flash" }
+  }
+}

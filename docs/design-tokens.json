@@ -1,0 +1,154 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "source": "Spotify design language adapted for broadcast production tool",
+    "date": "2026-06-01",
+    "notes": "Dark mode only. Spotify's #121212/#282828/#1DB954 palette. Inter font (open-source equivalent of Spotify's Circular). 4px base grid. 48px minimum touch targets for outdoor use."
+  },
+
+  "color": {
+    "background": {
+      "base":    { "value": "#121212", "usage": "Page/screen background — deepest layer" },
+      "surface": { "value": "#1E1E1E", "usage": "Cards, modals, bottom sheets" },
+      "raised":  { "value": "#2A2A2A", "usage": "Elevated cards, dropdown menus" },
+      "overlay": { "value": "#3A3A3A", "usage": "Input fields, toggle tracks, inactive tabs" }
+    },
+
+    "brand": {
+      "primary":     { "value": "#1DB954", "usage": "LIVE indicator, Go Live button, active states, primary CTA. Spotify green." },
+      "primaryDim":  { "value": "#158A3E", "usage": "Pressed state of primary" },
+      "primaryGlow": { "value": "#1DB95420", "usage": "Pulsing halo behind LIVE indicator" }
+    },
+
+    "semantic": {
+      "live":    { "value": "#1DB954", "usage": "Streaming active, camera connected 🟢" },
+      "warning": { "value": "#F59B23", "usage": "Weak signal, camera reconnecting 🟡" },
+      "danger":  { "value": "#E91429", "usage": "Camera disconnected, error, red card ⚫ → shown as red dot" },
+      "offline": { "value": "#535353", "usage": "Camera not joined ⚫" },
+      "info":    { "value": "#2D86FF", "usage": "Informational toasts, links" }
+    },
+
+    "score": {
+      "positive": { "value": "#1DB954", "usage": "Score increase animation flash" },
+      "negative": { "value": "#E91429", "usage": "Red card, foul, penalty indicator" },
+      "neutral":  { "value": "#B3B3B3", "usage": "No score change events (yellow card, timeout)" }
+    },
+
+    "text": {
+      "primary":   { "value": "#FFFFFF",  "usage": "Primary text, headings, scores" },
+      "secondary": { "value": "#B3B3B3",  "usage": "Labels, captions, metadata" },
+      "disabled":  { "value": "#535353",  "usage": "Disabled buttons, placeholders" },
+      "inverse":   { "value": "#121212",  "usage": "Text on primary-coloured backgrounds" }
+    },
+
+    "border": {
+      "subtle":   { "value": "#2A2A2A", "usage": "Card borders, dividers" },
+      "moderate": { "value": "#3A3A3A", "usage": "Input borders, section dividers" },
+      "strong":   { "value": "#535353", "usage": "Active input border, focus rings" }
+    },
+
+    "team": {
+      "home": { "value": "{runtime}", "usage": "Set from session.teams[0].colour at session creation. Never hardcoded." },
+      "away": { "value": "{runtime}", "usage": "Set from session.teams[1].colour at session creation. Never hardcoded." }
+    },
+
+    "overlay": {
+      "scorebugBg":   { "value": "#121212CC", "usage": "Scorebug background — 80% opacity black over video" },
+      "lowerThirdBg": { "value": "#1DB95499", "usage": "Event lower third — 60% opacity brand green. Swaps to team colour at runtime." },
+      "replayBg":     { "value": "#00000099", "usage": "REPLAY intro background — 60% opacity black" }
+    }
+  },
+
+  "typography": {
+    "fontFamily": {
+      "primary": { "value": "Inter", "fallback": "SF Pro Display, -apple-system, sans-serif", "usage": "All UI text" },
+      "mono":    { "value": "Inter", "variant": "tabular-nums", "usage": "Score numbers — tabular figures prevent layout shift on score update" }
+    },
+
+    "scale": {
+      "scorebug":  { "size": 48, "weight": 800, "lineHeight": 1.0, "tracking": "-0.02em", "usage": "Score numbers in broadcast overlay — must read at distance" },
+      "display":   { "size": 34, "weight": 700, "lineHeight": 1.1, "tracking": "-0.01em", "usage": "Large score display in Score Keeper + Host screens" },
+      "h1":        { "size": 28, "weight": 700, "lineHeight": 1.2, "tracking": "0",       "usage": "Screen titles, team names large" },
+      "h2":        { "size": 22, "weight": 600, "lineHeight": 1.3, "tracking": "0",       "usage": "Section headings, event button labels" },
+      "h3":        { "size": 18, "weight": 600, "lineHeight": 1.4, "tracking": "0",       "usage": "Card titles, source labels in Director screen" },
+      "body":      { "size": 15, "weight": 400, "lineHeight": 1.5, "tracking": "0",       "usage": "Body copy, participant list items" },
+      "label":     { "size": 13, "weight": 500, "lineHeight": 1.4, "tracking": "0.02em",  "usage": "Button labels, badges, tab labels" },
+      "caption":   { "size": 11, "weight": 400, "lineHeight": 1.4, "tracking": "0.03em",  "usage": "Timestamps, metadata, fine print" },
+      "overline":  { "size": 11, "weight": 600, "lineHeight": 1.0, "tracking": "0.08em",  "usage": "Section labels in ALL CAPS (e.g. LIVE, REPLAY, LOBBY)" }
+    }
+  },
+
+  "spacing": {
+    "base": 4,
+    "scale": {
+      "xs":  { "value": 4,  "usage": "Icon internal padding, tight gaps" },
+      "sm":  { "value": 8,  "usage": "Between label and value, tight list items" },
+      "md":  { "value": 16, "usage": "Standard component padding, card gaps" },
+      "lg":  { "value": 24, "usage": "Section padding, between major UI blocks" },
+      "xl":  { "value": 32, "usage": "Screen edge padding, large section gaps" },
+      "2xl": { "value": 48, "usage": "Hero section padding, large empty states" }
+    }
+  },
+
+  "touchTargets": {
+    "minimum":     { "value": 48, "unit": "px", "note": "WCAG AA + outdoor use. Every tappable element ≥ 48×48px." },
+    "comfortable": { "value": 56, "unit": "px", "usage": "Event buttons in Score Keeper — primary tap targets" },
+    "large":       { "value": 72, "unit": "px", "usage": "Go Live button, primary CTA on key screens" }
+  },
+
+  "radius": {
+    "sm":   { "value": 4,   "usage": "Badges, small chips" },
+    "md":   { "value": 8,   "usage": "Buttons, input fields" },
+    "lg":   { "value": 12,  "usage": "Cards, bottom sheets" },
+    "xl":   { "value": 16,  "usage": "Large cards, modals" },
+    "full": { "value": 999, "usage": "Pills, status dots, round buttons" }
+  },
+
+  "iconography": {
+    "set": "Lucide Icons",
+    "sizes": {
+      "sm": 16,
+      "md": 20,
+      "lg": 24,
+      "xl": 32
+    },
+    "style": "stroke-2, no fill — clean line icons matching Spotify's UI vocabulary"
+  },
+
+  "elevation": {
+    "none":   { "value": "none",                                       "usage": "Flat elements, background-level" },
+    "low":    { "value": "0 1px 3px #00000040",                       "usage": "Cards, raised surfaces" },
+    "medium": { "value": "0 4px 12px #00000060",                      "usage": "Bottom sheets, dropdowns" },
+    "high":   { "value": "0 8px 24px #00000080",                      "usage": "Modals, full-screen overlays" }
+  },
+
+  "animation": {
+    "duration": {
+      "instant": "100ms",
+      "fast":    "200ms",
+      "normal":  "300ms",
+      "slow":    "500ms"
+    },
+    "easing": {
+      "default":  "cubic-bezier(0.4, 0, 0.2, 1)",
+      "enter":    "cubic-bezier(0, 0, 0.2, 1)",
+      "exit":     "cubic-bezier(0.4, 0, 1, 1)",
+      "spring":   "cubic-bezier(0.34, 1.56, 0.64, 1)"
+    },
+    "scorebug": {
+      "slideIn":     "translateY(100%) → translateY(0), 300ms enter easing",
+      "eventSwap":   "lower third slides up from bottom over scorebug in 300ms, holds 3s, slides back down in 200ms",
+      "replayIntro": "fade in 200ms, holds for clip duration, fade out 200ms",
+      "scoreUpdate": "number scales 1→1.3→1 in 300ms spring easing, brief green flash on background"
+    }
+  },
+
+  "broadcast": {
+    "canvas": { "width": 1920, "height": 1080, "safeZoneInset": 96 },
+    "scorebugPosition": "bottom-right",
+    "scorebugMaxWidth": 320,
+    "lowerThirdMaxWidth": 640,
+    "lowerThirdPosition": "bottom-left",
+    "safeArea": "content must stay within 96px inset from all edges (broadcast safe area)"
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "project": "GenStadium",
+  "repo": "Masta-C/genstadium",
+  "last_updated": "2026-06-04",
+  "tasks": [
+    {
+      "id": "github-setup",
+      "issue": "#1 + #11",
+      "title": "GitHub: branch protection + CODEOWNERS + production environment",
+      "phase": 0,
+      "status": "complete",
+      "completed_at": "2026-06-04",
+      "notes": "develop + main rulesets active, repo made public, production environment created",
+      "task_file": "01-github.md"
+    },
+    {
+      "id": "firebase-project",
+      "issue": "#3",
+      "title": "Firebase project: Auth + Firestore + Hosting + Functions + credentials",
+      "phase": 0,
+      "status": "complete",
+      "completed_at": "2026-06-06",
+      "notes": "project ID: genstadium-2321, credentials saved to app/, .firebaserc created, GitHub secrets GCP_SERVICE_ACCOUNT_KEY + FIREBASE_PROJECT_ID set",
+      "task_file": "02-firebase.md"
+    },
+    {
+      "id": "firebase-auth",
+      "issue": "#12",
+      "title": "Firebase Auth: enable Email/Password + Google provider + download platform credentials",
+      "phase": 2,
+      "status": "complete",
+      "completed_at": "2026-06-06",
+      "notes": "Email/Password, Google, and Anonymous all enabled",
+      "task_file": "03-firebase-auth.md"
+    },
+    {
+      "id": "google-signin",
+      "issue": "#13",
+      "title": "Google Sign-In: OAuth client IDs + all 3 SHA-1 fingerprints + REVERSED_CLIENT_ID",
+      "phase": 2,
+      "status": "complete",
+      "completed_at": "2026-06-06",
+      "notes": "debug SHA-1 registered in Firebase + ANDROID_SHA1_DEBUG GitHub secret set. REVERSED_CLIENT_ID: com.googleusercontent.apps.46093505832-3jbpt619rvlaucd3csn1tjcdbcc013tl. EAS SHA-1 to be added after issue #9.",
+      "task_file": "04-google-signin.md"
+    },
+    {
+      "id": "cloud-run",
+      "issue": "#56",
+      "title": "Cloud Run: create service in Google Cloud Console, asia-south1, min-instances=1",
+      "phase": 2,
+      "status": "complete",
+      "completed_at": "2026-06-06",
+      "notes": "URL: https://genstadium-cloud-run-46093505832.asia-south1.run.app, CLOUD_RUN_URL GitHub secret set, IAM roles: Cloud Datastore User + Storage Object Admin + Firebase Admin SDK Administrator added to 46093505832-compute@developer.gserviceaccount.com",
+      "task_file": "05-cloud-run.md"
+    },
+    {
+      "id": "livekit",
+      "issue": "#58",
+      "title": "LiveKit Cloud: create project + API key + secret + set env vars",
+      "phase": 2,
+      "status": "complete",
+      "completed_at": "2026-06-06",
+      "notes": "wss://genstadium-2y8l0ov4.livekit.cloud, API key: APIatPurtUBszHT, GitHub secrets + .env.local set",
+      "task_file": "06-livekit.md"
+    },
+    {
+      "id": "gcs-buckets",
+      "issue": "#72",
+      "title": "GCS: create DVR bucket + prefetch bucket + lifecycle rules + CORS + service account",
+      "phase": 2,
+      "status": "complete",
+      "completed_at": "2026-06-06",
+      "notes": "genstadium-dvr + genstadium-prefetched created in asia-south1, 1-day lifecycle rules set, CORS configured, GitHub secrets GCS_DVR_BUCKET + GCS_PREFETCHED_BUCKET set",
+      "task_file": "07-gcs-buckets.md"
+    },
+    {
+      "id": "stripe",
+      "issue": "#84",
+      "title": "Stripe: create account + webhook endpoint + credits product + store webhook secret",
+      "phase": 2,
+      "status": "complete",
+      "completed_at": "2026-06-06",
+      "notes": "Product: GenStadium Event Credit, price_1TfFWQSJz15u8exec1wCgpNF, webhook pointing to Cloud Run /webhooks/stripe, GitHub secrets STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET + STRIPE_PRICE_ID set",
+      "task_file": "08-stripe.md"
+    },
+    {
+      "id": "appstore",
+      "issue": "#85",
+      "title": "App Store Connect: create IAP product for credit pack + sandbox test account",
+      "phase": 2,
+      "status": "pending",
+      "completed_at": null,
+      "notes": "",
+      "task_file": "09-appstore.md"
+    }
+  ]
+}

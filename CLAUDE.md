@@ -18,9 +18,9 @@ A **broadcast-grade live sports production app** that turns smartphones into a m
 
 ## Current Phase
 
-**Pre-development — architecture locked, repo scaffold not yet built.**
+**Pre-development — prototype complete, architecture locked, repo scaffold not yet built.**
 
-All architecture decisions are locked from a full grill-me session. See `docs/adr/` for each decision with rationale. No code exists yet. Next step: repo scaffold → Tier 0 scorebug.
+Prototype lives at `docs/prototype/index.html` (served on localhost:8899). All UX decisions locked from grill-me session + 2-session design sprint. Next step: Figma design → repo scaffold.
 
 ### Tier 0 (ship first — scorebug only, free)
 - Score Keeper phone + browser overlay
@@ -28,9 +28,9 @@ All architecture decisions are locked from a full grill-me session. See `docs/ad
 - Used as a **top-of-funnel lead magnet** for Tier 1
 
 ### Tier 1 (full production)
-- 4 roles: Host, Camera, Director, Score Keeper
-- Multi-camera stream → YouTube via LiveKit Egress
-- Instant replay via LiveKit Ingress + FFmpeg pre-fetch
+- 3 roles: Director (merged Host+Director), Camera, Score Keeper
+- Multi-camera stream → YouTube via LiveKit Egress (Livestream)
+- Instant replay via LiveKit Ingress + FFmpeg pre-fetch (Replays → GCS)
 - Credits purchased on web, consumed in-app
 
 ---
@@ -60,11 +60,13 @@ All architecture decisions are locked from a full grill-me session. See `docs/ad
 
 ## Roles & Permissions
 
+> **Host role has been removed.** Host and Director are merged into a single Director role.
+
 ```
-host         → create sessions, go live, manage stream settings, view credits
-director     → switch camera sources, control scorebug visibility, trigger replay/ads
-camera       → publish video feed to LiveKit room (anonymous auth ok)
-scorekeeper  → log score events, manage game state (anonymous auth ok)
+director     → create sessions, label cameras, set sport, set animations, connect YouTube,
+               go live, switch camera sources, trigger replays, end session, view credits
+camera       → publish video feed to LiveKit room (guest join — name only, no account)
+scorekeeper  → log score events, manage game state (guest join — name only, no account)
 ```
 
 Role is stored as a **Firestore field** on the session participant document, NOT as a JWT custom claim (anonymous users don't have stable UIDs for claims).
@@ -169,15 +171,19 @@ Credit check before Go Live:
 
 ## LiveKit Architecture
 
-**Egress A** — Room Composite → YouTube RTMP
+**Livestream (was Egress A)** — Room Composite → YouTube RTMP
 - Headless Chrome renders `graphics.genstadium.com?layout={sessionId}`
 - Layout page subscribes to Firestore for score state + director commands
 - Output: RTMPS stream to YouTube
+- Optional — Director can skip and record locally only
 
-**Egress B** — Track Egress → GCS DVR
-- Records individual camera tracks to GCS as HLS segments
+**Replays (was Egress B)** — Track Egress → GCS DVR
+- Records **only the ISO Camera** track (not all cameras) — `session.replayCameraSlot`
+- ISO Camera designated by Director during Camera Slots setup (default: `cam_1`)
 - 4-second segments, 120-second rolling window enforced in code
 - GCS lifecycle: 1 day (safety net only — code enforces the 120s window)
+- Director taps "Replay Ready 🎬" badge to broadcast a clip
+- If ISO Camera is offline: badge stops appearing, Director sees ⚠️ warning
 
 **Replay flow** (speculative pre-fetch):
 1. Score Keeper logs event with `triggers: ["prefetch"]`
@@ -289,6 +295,65 @@ Expo Metro:         localhost:8082
 | director | director@genstadium.dev | Test1234! |
 
 Camera and Score Keeper: anonymous auth via join code. Test join code: `TEST01`
+
+---
+
+## Current Phase
+
+**Pre-development — architecture locked, AGENT.md written, monorepo scaffold not yet built.**
+
+Next step: run `#2` (monorepo scaffold) then start Ralph Loop from `#17` (eventConfig).
+
+Ralph Loop start command:
+```
+/loop Read AGENT.md at /Users/chetanpatil/genstadium/AGENT.md and execute one full Ralph Loop iteration for the GenStadium repo at /Users/chetanpatil/genstadium
+```
+
+---
+
+## Score Keeper UX — Locked Decisions
+
+### 3-Tier Button System
+- **T1 — Primary scoring** (large, ~50% panel space): Goals, +3/+2, SIX/FOUR, TD. Bold numbers or sport icons. Green tint.
+- **T2 — Discipline events** (medium): Cards, fouls, wickets. Triggers broadcast animation. Colour = caution/danger.
+- **T3 — Admin / stats** (small, 3–4 per row): Corners, subs, extras. Text abbreviations OK.
+- **Hold 300ms** on any T3 → tooltip shows full name + description. First-session onboarding teaches this.
+
+### Attribution System (soft mandatory, 8s)
+- Score registers on board + broadcast **instantly**
+- Attribution sheet slides up for **8 seconds**
+- Timer expires → auto-logs as **"Unknown"** (visible in scorecard with grey badge)
+- Score is NEVER blocked by attribution
+- Simple picker: Card / Foul. Rich sheet: Wicket (batsman+bowler+dismissal+fielder). Sub: player IN + OUT.
+
+### Cricket On-Strike Toggle
+- Both batsmen shown in team header; active highlighted in green
+- Auto-rotates on 1 and 3 runs; manual override by tapping the other chip
+
+### Undo: stack-based always visible + 10-event log for targeted removal
+
+### Overlays: always on, lower third fires automatically, no Director toggle
+
+### Scorecard (end of session)
+- Match-level stats only, no career data
+- Cricket: Batting (R/B/4s/6s/SR) + Bowling (O/M/R/W/ECO)
+- Basketball: PTS + Fouls per player
+- Soccer / Am. Football: chronological event log
+- Pickleball / Badminton: game-by-game table + fault breakdown
+
+---
+
+## Director Flow (11 steps — locked)
+
+Sign Up → Create Session (name+sport) → Camera Slots → Event Animations → Share Link → Lobby → Livestream Setup (optional YouTube) → Go Live → Live (camera switching + Replay banner) → End Session → Summary
+
+## Score Keeper Flow (9 steps — locked)
+
+Guest Landing → Guest Join → Team Setup (names+colours) → Roster Setup (flexible, skip ok) → Who Goes First (toss) → Ready (onboarding overlay fires) → Live Scoring (landscape split panel) → Event Log → Session Ended + Scorecard
+
+## Camera Flow (5 steps — locked)
+
+Guest Landing → Guest Join → Pick Slot (Director's labels + real-time availability) → Camera Live (viewfinder + LIVE badge + flip + signal) → Session Ended
 
 ---
 
