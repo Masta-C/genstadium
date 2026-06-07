@@ -15,7 +15,7 @@
 
 import type { SportEvent, SportKey } from '@genstadium/event-config'
 import { eventConfig } from '@genstadium/event-config'
-import React, { useCallback, useRef } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import {
   Animated,
   StyleSheet,
@@ -136,19 +136,44 @@ function T2Button({ event, teamId, onPress }: ButtonProps) {
 
 function T3Button({ event, teamId, onPress }: ButtonProps) {
   const { scale, triggerRipple } = useRipple()
+  const [tooltipVisible, setTooltipVisible] = useState(false)
+
+  // Long press shows tooltip — does NOT trigger the tap action
+  function handleLongPress() {
+    setTooltipVisible(true)
+  }
+
+  // Release hides tooltip
+  function handlePressOut() {
+    setTooltipVisible(false)
+  }
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <TouchableOpacity
-        style={styles.t3Button}
-        onPress={() => { triggerRipple(); onPress(event, teamId) }}
-        activeOpacity={1}
-        accessibilityLabel={event.tip ?? event.label}
-        accessibilityRole="button"
-      >
-        <Text style={styles.t3Label}>{event.label}</Text>
-      </TouchableOpacity>
-    </Animated.View>
+    <View style={styles.t3Wrapper}>
+      {/* Tooltip popover — shown above button on hold */}
+      {tooltipVisible && event.tip ? (
+        <View style={styles.tooltip} pointerEvents="none">
+          <Text style={styles.tooltipTitle}>{event.label}</Text>
+          <Text style={styles.tooltipDesc}>{event.tip}</Text>
+          <View style={styles.tooltipArrow} />
+        </View>
+      ) : null}
+
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <TouchableOpacity
+          style={styles.t3Button}
+          onPress={() => { triggerRipple(); onPress(event, teamId) }}
+          onLongPress={handleLongPress}
+          onPressOut={handlePressOut}
+          delayLongPress={300}
+          activeOpacity={1}
+          accessibilityLabel={event.tip ?? event.label}
+          accessibilityRole="button"
+        >
+          <Text style={styles.t3Label}>{event.label}</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   )
 }
 
@@ -277,6 +302,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 4,
   },
+  t3Wrapper: {
+    position: 'relative',
+  },
   t3Button: {
     minHeight: 44,
     minWidth: 44,
@@ -293,6 +321,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  // Tooltip popover
+  tooltip: {
+    position: 'absolute',
+    bottom: '100%',
+    left: '50%',
+    transform: [{ translateX: -80 }],
+    width: 160,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    zIndex: 50,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  tooltipTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 3,
+  },
+  tooltipDesc: {
+    color: '#B3B3B3',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  tooltipArrow: {
+    position: 'absolute',
+    bottom: -6,
+    left: '50%',
+    width: 12,
+    height: 12,
+    backgroundColor: '#2A2A2A',
+    transform: [{ translateX: -6 }, { rotate: '45deg' }],
   },
   // Card shape (yellow/red card)
   cardShape: {
