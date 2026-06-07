@@ -2,9 +2,120 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Placeholder rules — full implementation in issue #8
-    match /{document=**} {
-      allow read, write: if false;
+
+    // -------------------------------------------------------------------------
+    // Helper functions
+    // -------------------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Returns the participant doc for the calling user in a given session.
+    function getParticipant(sessionId) {
+      return get(/databases/$(database)/documents/sessions/$(sessionId)/participants/$(request.auth.uid));
+    }
+
+    function participantExists(sessionId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/sessions/$(sessionId)/participants/$(request.auth.uid));
+    }
+
+    function participantRole(sessionId) {
+      return getParticipant(sessionId).data.role;
+    }
+
+    function isDirector(sessionId) {
+      return participantExists(sessionId) && participantRole(sessionId) == 'director';
+    }
+
+    function isScoreKeeper(sessionId) {
+      return participantExists(sessionId) && participantRole(sessionId) == 'scorekeeper';
+    }
+
+    function isSessionCreator(sessionId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/sessions/$(sessionId)).data.createdBy == request.auth.uid;
+    }
+
+    // -------------------------------------------------------------------------
+    // users/{uid}
+    // Owner can read and write their own profile.
+    // No other user can read or write.
+    // -------------------------------------------------------------------------
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      // credits subcollection — read-only from client.
+      // Written exclusively by Stripe / StoreKit webhook Cloud Functions.
+      match /credits/{doc} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // sessions/{sessionId}
+    // - Session creator (Director) can create and update the session document.
+    // - Any authenticated participant in the session can read.
+    // - Anonymous users can read if they have a participant record in the session.
+    // -------------------------------------------------------------------------
+    match /sessions/{sessionId} {
+      allow read: if participantExists(sessionId);
+      allow create: if isSignedIn();
+      allow update: if isSessionCreator(sessionId);
+      allow delete: if false;
+
+      // -- participants subcollection --
+      // Any signed-in user can write their own participant doc (join flow).
+      // Participants can read all participant docs in their session.
+      match /participants/{participantId} {
+        allow read: if participantExists(sessionId);
+        allow create: if isSignedIn() && request.auth.uid == participantId;
+        allow update: if isSignedIn() && request.auth.uid == participantId;
+        allow delete: if false;
+      }
+
+      // -- events subcollection --
+      // Only the Score Keeper participant may write events.
+      // Any session participant can read events (for scorecard / event log).
+      match /events/{eventId} {
+        allow read: if participantExists(sessionId);
+        allow create: if isScoreKeeper(sessionId);
+        allow update: if isScoreKeeper(sessionId);
+        allow delete: if false;
+      }
+
+      // -- scoreState subcollection --
+      // Read-only from client. Written by Cloud Function only.
+      match /scoreState/{doc} {
+        allow read: if participantExists(sessionId);
+        allow write: if false;
+      }
+
+      // -- stageHistory subcollection --
+      // Director can write; participants can read.
+      match /stageHistory/{stageId} {
+        allow read: if participantExists(sessionId);
+        allow write: if isDirector(sessionId);
+      }
+
+      // -- replayClips subcollection --
+      // Read by participants; written by Cloud Run (Admin SDK bypasses rules).
+      match /replayClips/{clipId} {
+        allow read: if participantExists(sessionId);
+        allow write: if false;
+      }
+
+      // -- private subcollection (YouTube stream keys etc.) --
+      // Director only; never exposed to Camera or Score Keeper.
+      match /private/{doc} {
+        allow read, write: if isSessionCreator(sessionId);
+      }
     }
   }
 }
