@@ -1,6 +1,6 @@
 ---
 name: genstadium-dev-ready
-description: Start, seed, and validate the GenStadium local development environment — Firebase emulators (Auth, Firestore, Functions) + Cloud Run local server + Expo Metro bundler. Use whenever working on GenStadium and you need to check if the dev environment is running, start it from scratch, re-seed test data, or verify all services are healthy. Trigger on phrases like "start the dev environment", "spin up emulators", "dev ready", "start genstadium locally", or any time about to test auth, Firestore, LiveKit tokens, or Cloud Run endpoints.
+description: Start, seed, and validate the GenStadium local development environment — Firebase emulators (Auth, Firestore, Functions, Hosting) + Cloud Run local server + Expo Metro bundler. Use whenever working on GenStadium and you need to check if the dev environment is running, start it from scratch, re-seed test data, or verify all services are healthy. Trigger on phrases like "start the dev environment", "spin up emulators", "dev ready", "start genstadium locally", or any time about to test auth, Firestore, LiveKit tokens, or Cloud Run endpoints.
 ---
 
 # GenStadium Dev Ready
@@ -11,9 +11,10 @@ Start, validate, and seed the full local GenStadium dev stack in the right order
 
 | Service | Port | Start command |
 |---|---|---|
-| Firebase Auth emulator | 9099 | `firebase emulators:start` |
+| Firebase Auth emulator | 9099 | `npm run emulators` (repo root) |
 | Firestore emulator | 8080 | (same process) |
 | Functions emulator | 5001 | (same process) |
+| Hosting emulator | 5002 | (same process) |
 | Emulator UI | 4000 | (same process) |
 | Cloud Run local | 8081 | `npm run dev` in `cloud-run/` |
 | Expo Metro | 8082 | `npx expo start` in `app/` |
@@ -22,12 +23,13 @@ Start, validate, and seed the full local GenStadium dev stack in the right order
 
 ## Step 1 — Check What's Already Running
 
-Run these checks individually (never chain with `&&` — zsh `status=$(...)` is unreliable):
+Run each check individually — never chain with `&&` and never use `status=$(...)` in zsh (unreliable):
 
 ```bash
 curl -s http://localhost:9099 -o /dev/null -w "%{http_code}"
 curl -s http://localhost:8080 -o /dev/null -w "%{http_code}"
 curl -s http://localhost:5001 -o /dev/null -w "%{http_code}"
+curl -s http://localhost:5002 -o /dev/null -w "%{http_code}"
 curl -s http://localhost:4000 -o /dev/null -w "%{http_code}"
 curl -s http://localhost:8081/health -o /dev/null -w "%{http_code}"
 ```
@@ -43,7 +45,8 @@ curl -s http://localhost:8081/health -o /dev/null -w "%{http_code}"
 **Firebase Emulators** (if ports 9099, 8080, 5001 are down):
 ```bash
 # From repo root — imports snapshot so emulators boot pre-loaded
-firebase emulators:start --import=./emulator-data --export-on-exit
+npm run emulators
+# Equivalent: firebase emulators:start --import=./emulator-data --export-on-exit
 ```
 Wait for: `All emulators ready!` in terminal output.
 
@@ -57,7 +60,7 @@ LIVEKIT_API_SECRET=devsecret \
 LIVEKIT_URL=wss://dev.livekit.cloud \
 npm run dev
 ```
-Wait for: `Cloud Run local server listening on :8081`
+Wait for: `Cloud Run listening on :8081`
 
 **Expo Metro** (if port 8082 is down — only needed for app work):
 ```bash
@@ -71,34 +74,38 @@ npx expo start
 
 ## Step 3 — Seed Data (if Firestore is empty)
 
-Check if seed needed:
+Check if seed is needed:
 ```bash
-curl -s "http://localhost:8080/v1/projects/genstadium-dev/databases/(default)/documents/users" | python3 -c "import sys,json; d=json.load(sys.stdin); print('has_users:', len(d.get('documents', [])) > 0)"
+curl -s "http://localhost:8080/v1/projects/genstadium-2321/databases/(default)/documents/sessions" | python3 -c "import sys,json; d=json.load(sys.stdin); print('seeded:', len(d.get('documents', [])) > 0)"
 ```
 
-If `has_users: False`, run seed:
+If `seeded: False`, run both seed scripts (idempotent — safe to re-run):
 ```bash
-# Auth users
+# Step 1: Auth users
 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 \
 FIRESTORE_EMULATOR_HOST=localhost:8080 \
 npx ts-node --esm scripts/seed-auth.ts
 
-# Firestore data
-EXPO_PUBLIC_USE_EMULATOR=true \
+# Step 2: Session + Firestore data
 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 \
 FIRESTORE_EMULATOR_HOST=localhost:8080 \
 npx ts-node --esm scripts/seed.ts
+```
+
+Or run both at once from repo root:
+```bash
+npm run seed
 ```
 
 ---
 
 ## Step 4 — Health Check
 
-Verify Cloud Run is running and connected to emulators:
+Verify Cloud Run is up:
 ```bash
-curl -s http://localhost:8081/health | python3 -c "import sys,json; d=json.load(sys.stdin); print(d)"
+curl -s http://localhost:8081/health
 ```
-Expected: `{ "status": "ok", "firestore": "emulator", "auth": "emulator" }`
+Expected: `{"status":"ok"}`
 
 ---
 
@@ -110,26 +117,28 @@ Output a summary table:
 ✅ Firebase Auth emulator    localhost:9099
 ✅ Firestore emulator        localhost:8080
 ✅ Functions emulator        localhost:5001
+✅ Hosting emulator          localhost:5002
 ✅ Emulator UI               localhost:4000
 ✅ Cloud Run local           localhost:8081
 ⚫ Expo Metro                localhost:8082  (start manually if needed)
 
 Test credentials:
-  host@genstadium.dev     / Test1234!
   director@genstadium.dev / Test1234!
-  Camera/Score Keeper: anonymous auth via join code TEST01
+  Camera / Score Keeper: anonymous auth via join code TEST01
 
-⚠️  Always test auth in an incognito window — stale cookies cause redirect loops
+Session seeded: TEST01 (Mumbai FC vs Pune FC, soccer, status=lobby)
+Emulator UI: http://localhost:4000
 ```
 
 ---
 
 ## Known Issues
 
-- **Emulator boot order matters**: Firebase emulators must be running before Cloud Run local starts (Cloud Run connects to Firestore on startup)
-- **`window.__gsEmulatorsConnected` guard**: If Firebase SDK connects twice (Fast Refresh), auth emulator breaks silently — check `window.__gsEmulatorsConnected` in browser console
-- **Expo Go**: Do NOT test Google Sign-In in Expo Go — requires a dev build. Anonymous auth works in Expo Go.
-- **LiveKit**: Local dev uses LiveKit Cloud (not emulated). LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be real LiveKit Cloud keys for any streaming tests. Score/director flow works without LiveKit.
+- **Emulator boot order**: Firebase emulators must be running before Cloud Run local starts (Cloud Run connects to Firestore on startup)
+- **`window.__gsEmulatorsConnected` guard**: If Firebase SDK connects twice (Fast Refresh), the auth emulator connection will throw. The guard in `app/lib/firebase/client.ts` prevents this — check `window.__gsEmulatorsConnected` in console if auth breaks unexpectedly
+- **Expo Go**: Do NOT test Google Sign-In in Expo Go — requires a dev build. Anonymous auth works fine in Expo Go
+- **LiveKit**: Local dev uses LiveKit Cloud (not emulated). Score Keeper and Director flows work without LiveKit; Camera live screen requires real LiveKit keys
+- **emulator-data/ snapshot**: After seeding, emulators auto-export on exit (via `--export-on-exit`). Next `npm run emulators` picks up the snapshot automatically — `npm run seed` only needed the first time or after clearing the snapshot
 
 ---
 
