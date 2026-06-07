@@ -14,6 +14,7 @@ import { AttributionSheet } from '../../components/AttributionSheet'
 import { CricketPanel } from '../../components/CricketPanel'
 import { EventButtons } from '../../components/EventButtons'
 import { OnboardingOverlay, shouldShowOnboarding } from '../../components/OnboardingOverlay'
+import { WicketSheet } from '../../components/WicketSheet'
 import { auth, db } from '../../lib/firebase/client'
 
 interface Team {
@@ -74,8 +75,16 @@ export default function SkLiveScreen() {
   })
   const [lastEventLabel, setLastEventLabel] = useState('No events yet')
   const [pendingAttribution, setPendingAttribution] = useState<PendingAttribution | null>(null)
+  const [pendingWicketEventId, setPendingWicketEventId] = useState<string | null>(null)
   const [lastEventId, setLastEventId] = useState<string | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [cricketState, setCricketState] = useState<{
+    battingTeamId: string
+    bowlingTeamId: string
+    currentBowler: string
+    strikerPlayerId: string
+    nonStrikerPlayerId: string
+  } | null>(null)
   const scoreFlashScale = useRef(new Animated.Value(1)).current
   const unsubRef = useRef<(() => void) | null>(null)
 
@@ -147,6 +156,11 @@ export default function SkLiveScreen() {
         loggedBy: uid,
       }).then((docRef) => {
         setLastEventId(docRef.id)
+        // Wicket: open WicketSheet instead of attribution sheet
+        if (event.id === 'wicket') {
+          setPendingWicketEventId(docRef.id)
+          return
+        }
         // Open attribution sheet after write — only if event expects playerId
         if (event.metadata.includes('playerId')) {
           setPendingAttribution({
@@ -247,6 +261,7 @@ export default function SkLiveScreen() {
             scoreFlashScale={scoreFlashScale}
             homeScore={scoreState.homeScore}
             awayScore={scoreState.awayScore}
+            onCricketStateChange={setCricketState}
           />
         ) : (
           <>
@@ -299,6 +314,24 @@ export default function SkLiveScreen() {
           <Text style={styles.logButtonText}>📋 Log</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Wicket sheet — cricket only, opened instead of attribution sheet for wicket events */}
+      {pendingWicketEventId && sessionId && cricketState ? (
+        <WicketSheet
+          sessionId={sessionId}
+          eventId={pendingWicketEventId}
+          bowlingTeamId={cricketState.bowlingTeamId}
+          currentBowler={cricketState.currentBowler}
+          strikerName={
+            players.find((p) => p.id === cricketState.strikerPlayerId)?.name ?? 'Striker'
+          }
+          nonStrikerName={
+            players.find((p) => p.id === cricketState.nonStrikerPlayerId)?.name ?? 'Non-striker'
+          }
+          players={players}
+          onDismiss={() => setPendingWicketEventId(null)}
+        />
+      ) : null}
 
       {/* First-session onboarding overlay — dismissed state persisted to AsyncStorage */}
       {showOnboarding ? (

@@ -54,6 +54,8 @@ interface CricketPanelProps {
   scoreFlashScale: Animated.Value
   homeScore: number
   awayScore: number
+  /** Called when cricketState changes — parent uses it to populate WicketSheet */
+  onCricketStateChange?: (state: CricketState) => void
 }
 
 const DEFAULT_CRICKET_STATE = (battingTeamId: string, bowlingTeamId: string): CricketState => ({
@@ -76,6 +78,7 @@ export function CricketPanel({
   scoreFlashScale,
   homeScore,
   awayScore,
+  onCricketStateChange,
 }: CricketPanelProps) {
   const battingTeamIdDefault = whoGoesFirst || teams[0]?.id || 'team-a'
   const bowlingTeamIdDefault = teams.find((t) => t.id !== battingTeamIdDefault)?.id || 'team-b'
@@ -94,12 +97,15 @@ export function CricketPanel({
       if (snap.exists()) {
         const data = snap.data()
         if (data.cricketState) {
-          setCricketState(data.cricketState as CricketState)
+          const cs = data.cricketState as CricketState
+          setCricketState(cs)
+          onCricketStateChange?.(cs)
         } else {
           // initialise on first load
           const initial = DEFAULT_CRICKET_STATE(battingTeamIdDefault, bowlingTeamIdDefault)
           updateDoc(ref, { cricketState: initial }).catch(() => {/* silent */})
           setCricketState(initial)
+          onCricketStateChange?.(initial)
         }
       }
     })
@@ -155,7 +161,7 @@ export function CricketPanel({
     )
   }
 
-  // Intercept END_INN event to show confirm dialog instead of logging
+  // Intercept END_INN → confirm dialog. Wicket is handled by sk-live (WicketSheet).
   const handleEventTapWrapped = useCallback(
     (event: SportEvent, teamId: string) => {
       if (event.id === 'end_innings') {
