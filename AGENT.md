@@ -22,19 +22,28 @@ Check context window size at the **start** of each iteration (before Step 0) and
    HANDOFF: context limit reached — handoff at {path}
    Starting fresh session automatically.
    ```
-3. **Immediately invoke the `/schedule` skill** with args:
-   ```
-   Read {handoff_path} then read AGENT.md at /Users/chetanpatil/genstadium/AGENT.md and execute one full Ralph Loop iteration for the GenStadium repo at /Users/chetanpatil/genstadium
-   ```
-   `/schedule` creates a completely independent cloud session — new context window, no history from this session.
-4. Do NOT do anything else after invoking `/schedule`. This session is done.
+3. Print this exact block and stop — one human action (open new tab + paste) is required:
 
-**Why `/schedule` not `ScheduleWakeup` or `Agent`:**
-- `ScheduleWakeup` — re-invokes the SAME session. Context still full. Wrong.
-- `Agent` — subagent within the SAME session. Context still held. Wrong.
-- `/schedule` — cloud-scheduled independent run. Truly new session, empty context. Correct.
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RALPH LOOP PAUSED — context window full
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Open a NEW Claude Code tab and run:
 
-**Never let a full context window cause lost work or an incomplete issue. The handoff + `/schedule` is fully automatic — no human action required.**
+/loop Read {handoff_path} then read AGENT.md at /Users/chetanpatil/genstadium/AGENT.md and execute one full Ralph Loop iteration for the GenStadium repo at /Users/chetanpatil/genstadium
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+4. Do nothing else. This session is done.
+
+**Why one human click is unavoidable:** There is no mechanism to auto-spawn a new *local* Claude Code session from within a running one:
+- `ScheduleWakeup` — re-invokes the SAME session. Context still full.
+- `Agent` — subagent within the SAME session. Context still held.
+- `/schedule` — cloud session; cannot access local files or run local tools.
+
+The handoff doc preserves all state. Opening a new tab takes 2 seconds.
+
+**Never let a full context window cause lost work. The handoff captures everything — the human just opens a new tab.**
 
 ---
 
