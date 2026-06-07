@@ -5,7 +5,9 @@
   "workspaces": ["app", "cloud-run", "graphics", "packages/*"],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "emulators": "firebase emulators:start --import=./emulator-data --export-on-exit",
+    "emulators:clean": "firebase emulators:start"
   },
   "devDependencies": {
     "prettier": "^3.3.0"
