@@ -1,7 +1,7 @@
 import type { SportEvent, SportKey } from '@genstadium/event-config'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as ScreenOrientation from 'expo-screen-orientation'
-import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   StyleSheet,
@@ -70,6 +70,7 @@ export default function SkLiveScreen() {
   })
   const [lastEventLabel, setLastEventLabel] = useState('No events yet')
   const [pendingAttribution, setPendingAttribution] = useState<PendingAttribution | null>(null)
+  const [lastEventId, setLastEventId] = useState<string | null>(null)
   const unsubRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
@@ -131,6 +132,7 @@ export default function SkLiveScreen() {
         timestamp: serverTimestamp(),
         loggedBy: uid,
       }).then((docRef) => {
+        setLastEventId(docRef.id)
         // Open attribution sheet after write — only if event expects playerId
         if (event.metadata.includes('playerId')) {
           setPendingAttribution({
@@ -148,6 +150,23 @@ export default function SkLiveScreen() {
     },
     [sessionId],
   )
+
+  /**
+   * Soft-delete the last event (deleted: true).
+   * scoreStateAggregator already skips deleted events — score corrects silently.
+   * Score Keeper only — Director cannot modify events.
+   */
+  const handleUndo = useCallback(() => {
+    if (!sessionId || !lastEventId) return
+    updateDoc(doc(db, 'sessions', sessionId, 'events', lastEventId), {
+      deleted: true,
+    }).then(() => {
+      setLastEventId(null)
+      setLastEventLabel('Undo applied')
+    }).catch(() => {
+      // Silent failure
+    })
+  }, [sessionId, lastEventId])
 
   return (
     <View style={styles.container}>
@@ -210,7 +229,7 @@ export default function SkLiveScreen() {
 
       {/* Undo bar */}
       <View style={styles.undoBar}>
-        <TouchableOpacity style={styles.undoButton} onPress={() => {/* issue #35 */}} activeOpacity={0.7}>
+        <TouchableOpacity style={[styles.undoButton, !lastEventId && styles.undoButtonDisabled]} onPress={handleUndo} disabled={!lastEventId} activeOpacity={0.7}>
           <Text style={styles.undoButtonText}>↩ Undo</Text>
         </TouchableOpacity>
 
@@ -338,6 +357,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  undoButtonDisabled: { opacity: 0.4 },
   undoButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   lastEventLabel: {
     flex: 1,
