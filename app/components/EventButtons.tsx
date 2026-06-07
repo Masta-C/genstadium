@@ -15,14 +15,31 @@
 
 import type { SportEvent, SportKey } from '@genstadium/event-config'
 import { eventConfig } from '@genstadium/event-config'
-import React, { useCallback } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import {
+  Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
 import Svg, { Line, Rect } from 'react-native-svg'
+
+// ─── Ripple hook — ~300ms pulse, non-blocking ─────────────────────────────────
+
+function useRipple() {
+  const scale = useRef(new Animated.Value(1)).current
+
+  const triggerRipple = useCallback(() => {
+    scale.setValue(1)
+    Animated.sequence([
+      Animated.timing(scale, { toValue: 0.91, duration: 80, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 8 }),
+    ]).start()
+  }, [scale])
+
+  return { scale, triggerRipple }
+}
 
 // ─── Special button renderers ─────────────────────────────────────────────────
 
@@ -65,64 +82,98 @@ function T1Button({ event, teamId, onPress }: ButtonProps) {
   const isYellowCard = event.id === 'yellow_card'
   const isRedCard = event.id === 'red_card'
   const isWicket = event.id === 'wicket'
+  const { scale, triggerRipple } = useRipple()
 
   return (
-    <TouchableOpacity
-      style={styles.t1Button}
-      onPress={() => onPress(event, teamId)}
-      activeOpacity={0.7}
-      accessibilityLabel={event.label}
-      accessibilityRole="button"
-    >
-      {isYellowCard ? (
-        <YellowCard />
-      ) : isRedCard ? (
-        <RedCard />
-      ) : isWicket ? (
-        <StumpsIcon size={32} />
-      ) : (
-        <Text style={styles.t1Label}>{event.label}</Text>
-      )}
-    </TouchableOpacity>
+    <Animated.View style={[styles.t1ButtonWrapper, { transform: [{ scale }] }]}>
+      <TouchableOpacity
+        style={styles.t1Button}
+        onPress={() => { triggerRipple(); onPress(event, teamId) }}
+        activeOpacity={1}
+        accessibilityLabel={event.label}
+        accessibilityRole="button"
+      >
+        {isYellowCard ? (
+          <YellowCard />
+        ) : isRedCard ? (
+          <RedCard />
+        ) : isWicket ? (
+          <StumpsIcon size={32} />
+        ) : (
+          <Text style={styles.t1Label}>{event.label}</Text>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   )
 }
 
 function T2Button({ event, teamId, onPress }: ButtonProps) {
   const isYellowCard = event.id === 'yellow_card'
   const isRedCard = event.id === 'red_card'
-
   const bgColour = isRedCard ? '#3D0A0F' : isYellowCard ? '#3D2E00' : '#2A2214'
+  const { scale, triggerRipple } = useRipple()
 
   return (
-    <TouchableOpacity
-      style={[styles.t2Button, { backgroundColor: bgColour }]}
-      onPress={() => onPress(event, teamId)}
-      activeOpacity={0.7}
-      accessibilityLabel={event.label}
-      accessibilityRole="button"
-    >
-      {isYellowCard ? (
-        <YellowCard />
-      ) : isRedCard ? (
-        <RedCard />
-      ) : (
-        <Text style={styles.t2Label}>{event.label}</Text>
-      )}
-    </TouchableOpacity>
+    <Animated.View style={[styles.t2ButtonWrapper, { transform: [{ scale }] }]}>
+      <TouchableOpacity
+        style={[styles.t2Button, { backgroundColor: bgColour }]}
+        onPress={() => { triggerRipple(); onPress(event, teamId) }}
+        activeOpacity={1}
+        accessibilityLabel={event.label}
+        accessibilityRole="button"
+      >
+        {isYellowCard ? (
+          <YellowCard />
+        ) : isRedCard ? (
+          <RedCard />
+        ) : (
+          <Text style={styles.t2Label}>{event.label}</Text>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   )
 }
 
 function T3Button({ event, teamId, onPress }: ButtonProps) {
+  const { scale, triggerRipple } = useRipple()
+  const [tooltipVisible, setTooltipVisible] = useState(false)
+
+  // Long press shows tooltip — does NOT trigger the tap action
+  function handleLongPress() {
+    setTooltipVisible(true)
+  }
+
+  // Release hides tooltip
+  function handlePressOut() {
+    setTooltipVisible(false)
+  }
+
   return (
-    <TouchableOpacity
-      style={styles.t3Button}
-      onPress={() => onPress(event, teamId)}
-      activeOpacity={0.7}
-      accessibilityLabel={event.tip ?? event.label}
-      accessibilityRole="button"
-    >
-      <Text style={styles.t3Label}>{event.label}</Text>
-    </TouchableOpacity>
+    <View style={styles.t3Wrapper}>
+      {/* Tooltip popover — shown above button on hold */}
+      {tooltipVisible && event.tip ? (
+        <View style={styles.tooltip} pointerEvents="none">
+          <Text style={styles.tooltipTitle}>{event.label}</Text>
+          <Text style={styles.tooltipDesc}>{event.tip}</Text>
+          <View style={styles.tooltipArrow} />
+        </View>
+      ) : null}
+
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <TouchableOpacity
+          style={styles.t3Button}
+          onPress={() => { triggerRipple(); onPress(event, teamId) }}
+          onLongPress={handleLongPress}
+          onPressOut={handlePressOut}
+          delayLongPress={300}
+          activeOpacity={1}
+          accessibilityLabel={event.tip ?? event.label}
+          accessibilityRole="button"
+        >
+          <Text style={styles.t3Label}>{event.label}</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   )
 }
 
@@ -139,11 +190,13 @@ interface EventButtonsProps {
   teamId: string
   /** Called when any event button is tapped. Wires to Firestore write in #30. */
   onEventTap: (event: SportEvent, teamId: string) => void
+  /** Called additionally when a scoring event (scoreDelta != null) is tapped. Triggers score flash in sk-live. */
+  onScoringTap?: () => void
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function EventButtons({ sportKey, teamId, onEventTap }: EventButtonsProps) {
+export function EventButtons({ sportKey, teamId, onEventTap, onScoringTap }: EventButtonsProps) {
   const config = eventConfig[sportKey] ?? eventConfig.custom
   const t1Events = config.events.filter((e) => e.tier === 1)
   const t2Events = config.events.filter((e) => e.tier === 2)
@@ -152,8 +205,11 @@ export function EventButtons({ sportKey, teamId, onEventTap }: EventButtonsProps
   const handlePress = useCallback(
     (event: SportEvent, tId: string) => {
       onEventTap(event, tId)
+      if (event.scoreDelta !== null && onScoringTap) {
+        onScoringTap()
+      }
     },
-    [onEventTap],
+    [onEventTap, onScoringTap],
   )
 
   return (
@@ -201,6 +257,7 @@ const styles = StyleSheet.create({
     gap: 6,
     flex: 2,
   },
+  t1ButtonWrapper: { flex: 1 },
   t1Button: {
     flex: 1,
     minHeight: 56,
@@ -223,6 +280,7 @@ const styles = StyleSheet.create({
     gap: 6,
     flex: 1,
   },
+  t2ButtonWrapper: { flex: 1 },
   t2Button: {
     flex: 1,
     minHeight: 48,
@@ -244,6 +302,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 4,
   },
+  t3Wrapper: {
+    position: 'relative',
+  },
   t3Button: {
     minHeight: 44,
     minWidth: 44,
@@ -260,6 +321,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  // Tooltip popover
+  tooltip: {
+    position: 'absolute',
+    bottom: '100%',
+    left: '50%',
+    transform: [{ translateX: -80 }],
+    width: 160,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    zIndex: 50,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  tooltipTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 3,
+  },
+  tooltipDesc: {
+    color: '#B3B3B3',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  tooltipArrow: {
+    position: 'absolute',
+    bottom: -6,
+    left: '50%',
+    width: 12,
+    height: 12,
+    backgroundColor: '#2A2A2A',
+    transform: [{ translateX: -6 }, { rotate: '45deg' }],
   },
   // Card shape (yellow/red card)
   cardShape: {

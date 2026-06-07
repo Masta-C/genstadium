@@ -1,21 +1,34 @@
 import type { SportEvent, SportKey } from '@genstadium/event-config'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as ScreenOrientation from 'expo-screen-orientation'
-import { doc, getDoc, onSnapshot } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import { AttributionSheet } from '../../components/AttributionSheet'
+import { CricketPanel } from '../../components/CricketPanel'
 import { EventButtons } from '../../components/EventButtons'
-import { db } from '../../lib/firebase/client'
+import { OnboardingOverlay, shouldShowOnboarding } from '../../components/OnboardingOverlay'
+import { WicketSheet } from '../../components/WicketSheet'
+import { auth, db } from '../../lib/firebase/client'
 
 interface Team {
   id: string
   name: string
   colour: string
+}
+
+interface Player {
+  id: string
+  teamId: string
+  jerseyNumber: string
+  name: string
+  position: string
 }
 
 interface ScoreState {
@@ -24,17 +37,55 @@ interface ScoreState {
   period: string
 }
 
+interface PendingAttribution {
+  eventId: string
+  teamId: string
+  eventLabel: string
+  eventEmoji: string
+}
+
+const EVENT_EMOJIS: Record<string, string> = {
+  goal: '⚽',
+  own_goal: '⚽',
+  touchdown: '🏈',
+  field_goal: '🏈',
+  six: '🏏',
+  four: '🏏',
+  wicket: '🏏',
+  points_3: '🏀',
+  points_2: '🏀',
+  points_1: '🏀',
+  foul: '🟨',
+  yellow_card: '🟨',
+  red_card: '🟥',
+  fault: '❌',
+}
+
 export default function SkLiveScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>()
 
   const [teams, setTeams] = useState<Team[]>([])
+  const [players, setPlayers] = useState<Player[]>([])
   const [sportKey, setSportKey] = useState<SportKey>('soccer')
+  const [whoGoesFirst, setWhoGoesFirst] = useState('')
   const [scoreState, setScoreState] = useState<ScoreState>({
     homeScore: 0,
     awayScore: 0,
     period: '1st',
   })
-  const [lastEventLabel] = useState('No events yet')
+  const [lastEventLabel, setLastEventLabel] = useState('No events yet')
+  const [pendingAttribution, setPendingAttribution] = useState<PendingAttribution | null>(null)
+  const [pendingWicketEventId, setPendingWicketEventId] = useState<string | null>(null)
+  const [lastEventId, setLastEventId] = useState<string | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [cricketState, setCricketState] = useState<{
+    battingTeamId: string
+    bowlingTeamId: string
+    currentBowler: string
+    strikerPlayerId: string
+    nonStrikerPlayerId: string
+  } | null>(null)
+  const scoreFlashScale = useRef(new Animated.Value(1)).current
   const unsubRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
@@ -44,6 +95,13 @@ export default function SkLiveScreen() {
     }
   }, [])
 
+  // Show onboarding overlay first time Score Keeper reaches the live screen
+  useEffect(() => {
+    shouldShowOnboarding().then((show) => {
+      if (show) setShowOnboarding(true)
+    })
+  }, [])
+
   useEffect(() => {
     if (!sessionId) return
 
@@ -51,7 +109,9 @@ export default function SkLiveScreen() {
       if (snap.exists()) {
         const data = snap.data()
         setTeams((data.teams as Team[]) ?? [])
+        setPlayers((data.players as Player[]) ?? [])
         setSportKey((data.eventType as SportKey) ?? 'soccer')
+        setWhoGoesFirst((data.whoGoesFirst as string) ?? '')
       }
     })
 
@@ -75,10 +135,88 @@ export default function SkLiveScreen() {
   const teamA = teams[0]
   const teamB = teams[1]
 
-  // Wired to Firestore event write in #30. Score flash animation in #36.
-  const handleEventTap = useCallback((_event: SportEvent, _teamId: string) => {
-    // TODO(#30): write event to sessions/{sessionId}/events/{eventId}
-  }, [])
+  /**
+   * Writes a score event to sessions/{sessionId}/events/{eventId}.
+   * Event registers instantly — playerId starts null, filled by attribution sheet within 8s.
+   * Score flash animation wired in #36.
+   */
+  const handleEventTap = useCallback(
+    (event: SportEvent, teamId: string) => {
+      const uid = auth.currentUser?.uid
+      if (!sessionId || !uid) return
+
+      // Fire-and-forget write — score must register instantly on broadcast
+      addDoc(collection(db, 'sessions', sessionId, 'events'), {
+        eventType: event.id,
+        team: teamId,
+        playerId: null,
+        scoreDelta: event.scoreDelta,
+        metadata: {},
+        timestamp: serverTimestamp(),
+        loggedBy: uid,
+      }).then((docRef) => {
+        setLastEventId(docRef.id)
+        // Wicket: open WicketSheet instead of attribution sheet
+        if (event.id === 'wicket') {
+          setPendingWicketEventId(docRef.id)
+          return
+        }
+        // Open attribution sheet after write — only if event expects playerId
+        if (event.metadata.includes('playerId')) {
+          setPendingAttribution({
+            eventId: docRef.id,
+            teamId,
+            eventLabel: event.label,
+            eventEmoji: EVENT_EMOJIS[event.id] ?? '📌',
+          })
+        }
+      }).catch(() => {
+        // Silent failure — event may retry or SK can undo (#35)
+      })
+
+      setLastEventLabel(event.label)
+    },
+    [sessionId],
+  )
+
+  /**
+   * Soft-delete the last event (deleted: true).
+   * scoreStateAggregator already skips deleted events — score corrects silently.
+   * Score Keeper only — Director cannot modify events.
+   */
+  /**
+   * Score flash: scale 1 → 1.3 → 1 in ~300ms spring.
+   * Fires on scoring taps only (scoreDelta != null). Does not block next tap.
+   */
+  const handleScoringTap = useCallback(() => {
+    scoreFlashScale.setValue(1)
+    Animated.sequence([
+      Animated.spring(scoreFlashScale, {
+        toValue: 1.3,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      }),
+      Animated.spring(scoreFlashScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      }),
+    ]).start()
+  }, [scoreFlashScale])
+
+  const handleUndo = useCallback(() => {
+    if (!sessionId || !lastEventId) return
+    updateDoc(doc(db, 'sessions', sessionId, 'events', lastEventId), {
+      deleted: true,
+    }).then(() => {
+      setLastEventId(null)
+      setLastEventLabel('Undo applied')
+    }).catch(() => {
+      // Silent failure
+    })
+  }, [sessionId, lastEventId])
 
   return (
     <View style={styles.container}>
@@ -97,9 +235,9 @@ export default function SkLiveScreen() {
               {teamA.name}
             </Text>
           ) : null}
-          <Text style={styles.score}>
+          <Animated.Text style={[styles.score, { transform: [{ scale: scoreFlashScale }] }]}>
             {scoreState.homeScore} – {scoreState.awayScore}
-          </Text>
+          </Animated.Text>
           {teamB ? (
             <Text style={[styles.teamScoreLabel, { color: teamB.colour }]} numberOfLines={1}>
               {teamB.name}
@@ -110,38 +248,57 @@ export default function SkLiveScreen() {
         <View style={styles.topBarRight} />
       </View>
 
-      {/* Main panels */}
+      {/* Main panels — cricket uses single full-width panel */}
       <View style={styles.panels}>
-        {/* Team A panel */}
-        <View style={[styles.panel, teamA && { borderTopColor: teamA.colour }]}>
-          <Text style={[styles.panelHeading, teamA && { color: teamA.colour }]}>
-            {teamA?.name ?? 'Team A'}
-          </Text>
-          <EventButtons
-            sportKey={sportKey}
-            teamId={teamA?.id ?? 'team-a'}
+        {sportKey === 'cricket' && sessionId ? (
+          <CricketPanel
+            sessionId={sessionId}
+            teams={teams}
+            players={players}
+            whoGoesFirst={whoGoesFirst}
             onEventTap={handleEventTap}
+            onScoringTap={handleScoringTap}
+            scoreFlashScale={scoreFlashScale}
+            homeScore={scoreState.homeScore}
+            awayScore={scoreState.awayScore}
+            onCricketStateChange={setCricketState}
           />
-        </View>
+        ) : (
+          <>
+            {/* Team A panel */}
+            <View style={[styles.panel, teamA && { borderTopColor: teamA.colour }]}>
+              <Text style={[styles.panelHeading, teamA && { color: teamA.colour }]}>
+                {teamA?.name ?? 'Team A'}
+              </Text>
+              <EventButtons
+                sportKey={sportKey}
+                teamId={teamA?.id ?? 'team-a'}
+                onEventTap={handleEventTap}
+                onScoringTap={handleScoringTap}
+              />
+            </View>
 
-        <View style={styles.divider} />
+            <View style={styles.divider} />
 
-        {/* Team B panel */}
-        <View style={[styles.panel, teamB && { borderTopColor: teamB.colour }]}>
-          <Text style={[styles.panelHeading, teamB && { color: teamB.colour }]}>
-            {teamB?.name ?? 'Team B'}
-          </Text>
-          <EventButtons
-            sportKey={sportKey}
-            teamId={teamB?.id ?? 'team-b'}
-            onEventTap={handleEventTap}
-          />
-        </View>
+            {/* Team B panel */}
+            <View style={[styles.panel, teamB && { borderTopColor: teamB.colour }]}>
+              <Text style={[styles.panelHeading, teamB && { color: teamB.colour }]}>
+                {teamB?.name ?? 'Team B'}
+              </Text>
+              <EventButtons
+                sportKey={sportKey}
+                teamId={teamB?.id ?? 'team-b'}
+                onEventTap={handleEventTap}
+                onScoringTap={handleScoringTap}
+              />
+            </View>
+          </>
+        )}
       </View>
 
       {/* Undo bar */}
       <View style={styles.undoBar}>
-        <TouchableOpacity style={styles.undoButton} onPress={() => {/* issue #35 */}} activeOpacity={0.7}>
+        <TouchableOpacity style={[styles.undoButton, !lastEventId && styles.undoButtonDisabled]} onPress={handleUndo} disabled={!lastEventId} activeOpacity={0.7}>
           <Text style={styles.undoButtonText}>↩ Undo</Text>
         </TouchableOpacity>
 
@@ -157,6 +314,42 @@ export default function SkLiveScreen() {
           <Text style={styles.logButtonText}>📋 Log</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Wicket sheet — cricket only, opened instead of attribution sheet for wicket events */}
+      {pendingWicketEventId && sessionId && cricketState ? (
+        <WicketSheet
+          sessionId={sessionId}
+          eventId={pendingWicketEventId}
+          bowlingTeamId={cricketState.bowlingTeamId}
+          currentBowler={cricketState.currentBowler}
+          strikerName={
+            players.find((p) => p.id === cricketState.strikerPlayerId)?.name ?? 'Striker'
+          }
+          nonStrikerName={
+            players.find((p) => p.id === cricketState.nonStrikerPlayerId)?.name ?? 'Non-striker'
+          }
+          players={players}
+          onDismiss={() => setPendingWicketEventId(null)}
+        />
+      ) : null}
+
+      {/* First-session onboarding overlay — dismissed state persisted to AsyncStorage */}
+      {showOnboarding ? (
+        <OnboardingOverlay onDismiss={() => setShowOnboarding(false)} />
+      ) : null}
+
+      {/* Attribution sheet — overlays the screen, never blocks score */}
+      {pendingAttribution && sessionId ? (
+        <AttributionSheet
+          sessionId={sessionId}
+          eventId={pendingAttribution.eventId}
+          teamId={pendingAttribution.teamId}
+          eventLabel={pendingAttribution.eventLabel}
+          eventEmoji={pendingAttribution.eventEmoji}
+          players={players}
+          onDismiss={() => setPendingAttribution(null)}
+        />
+      ) : null}
     </View>
   )
 }
@@ -256,6 +449,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  undoButtonDisabled: { opacity: 0.4 },
   undoButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   lastEventLabel: {
     flex: 1,
