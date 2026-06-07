@@ -13,7 +13,14 @@
       "bundleIdentifier": "com.genstadium.app",
       "infoPlist": {
         "NSCameraUsageDescription": "GenStadium needs camera access to publish your video feed.",
-        "NSMicrophoneUsageDescription": "GenStadium needs microphone access for your live stream."
+        "NSMicrophoneUsageDescription": "GenStadium needs microphone access for your live stream.",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "$(REVERSED_CLIENT_ID)"
+            ]
+          }
+        ]
       }
     },
     "android": {
@@ -31,7 +38,8 @@
     "plugins": [
       "expo-router",
       "expo-screen-orientation",
-      "expo-clipboard"
+      "expo-clipboard",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true
