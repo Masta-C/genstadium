@@ -15,20 +15,26 @@ Check context window size at the **start** of each iteration (before Step 0) and
 
 ### If context is at orange/red, or if `/compact` fails to bring it back to green:
 1. Invoke the `/handoff` skill to generate a structured handoff document.
-   - The handoff MUST include: what was built this session, current git branch and stash state, which issue to pick next, all open PR URLs with CI status, and the rebase pattern note (rebase onto `fix/ci-emulator-agentmd-ci-check` until #113 merges).
+   - The handoff MUST include: what was built this session, current git branch and stash state, which issue to pick next, all open PR URLs with CI status, and the rebase pattern note.
    - Save to `mktemp -t handoff-XXXXXX.md` and capture the path.
 2. Output exactly:
    ```
    HANDOFF: context limit reached — handoff at {path}
-   Scheduling next iteration automatically.
+   Starting fresh session automatically.
    ```
-3. **Immediately call `ScheduleWakeup`** with:
-   - `delaySeconds: 60` (minimum allowed — gives current session time to flush)
-   - `prompt`: `/loop Read {handoff_path} then read AGENT.md at /Users/chetanpatil/genstadium/AGENT.md and execute one full Ralph Loop iteration for the GenStadium repo at /Users/chetanpatil/genstadium`
-   - `reason`: `"Ralph Loop handoff — continuing from context limit in fresh window"`
-4. Do NOT wait or do anything else after calling `ScheduleWakeup`. The new wakeup carries the loop forward.
+3. **Immediately invoke the `/schedule` skill** with args:
+   ```
+   Read {handoff_path} then read AGENT.md at /Users/chetanpatil/genstadium/AGENT.md and execute one full Ralph Loop iteration for the GenStadium repo at /Users/chetanpatil/genstadium
+   ```
+   `/schedule` creates a completely independent cloud session — new context window, no history from this session.
+4. Do NOT do anything else after invoking `/schedule`. This session is done.
 
-**Never let a full context window cause lost work or an incomplete issue. The handoff + ScheduleWakeup is fully automatic — no human action required.**
+**Why `/schedule` not `ScheduleWakeup` or `Agent`:**
+- `ScheduleWakeup` — re-invokes the SAME session. Context still full. Wrong.
+- `Agent` — subagent within the SAME session. Context still held. Wrong.
+- `/schedule` — cloud-scheduled independent run. Truly new session, empty context. Correct.
+
+**Never let a full context window cause lost work or an incomplete issue. The handoff + `/schedule` is fully automatic — no human action required.**
 
 ---
 
