@@ -15,14 +15,31 @@
 
 import type { SportEvent, SportKey } from '@genstadium/event-config'
 import { eventConfig } from '@genstadium/event-config'
-import React, { useCallback } from 'react'
+import React, { useCallback, useRef } from 'react'
 import {
+  Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
 import Svg, { Line, Rect } from 'react-native-svg'
+
+// ─── Ripple hook — ~300ms pulse, non-blocking ─────────────────────────────────
+
+function useRipple() {
+  const scale = useRef(new Animated.Value(1)).current
+
+  const triggerRipple = useCallback(() => {
+    scale.setValue(1)
+    Animated.sequence([
+      Animated.timing(scale, { toValue: 0.91, duration: 80, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 8 }),
+    ]).start()
+  }, [scale])
+
+  return { scale, triggerRipple }
+}
 
 // ─── Special button renderers ─────────────────────────────────────────────────
 
@@ -65,64 +82,73 @@ function T1Button({ event, teamId, onPress }: ButtonProps) {
   const isYellowCard = event.id === 'yellow_card'
   const isRedCard = event.id === 'red_card'
   const isWicket = event.id === 'wicket'
+  const { scale, triggerRipple } = useRipple()
 
   return (
-    <TouchableOpacity
-      style={styles.t1Button}
-      onPress={() => onPress(event, teamId)}
-      activeOpacity={0.7}
-      accessibilityLabel={event.label}
-      accessibilityRole="button"
-    >
-      {isYellowCard ? (
-        <YellowCard />
-      ) : isRedCard ? (
-        <RedCard />
-      ) : isWicket ? (
-        <StumpsIcon size={32} />
-      ) : (
-        <Text style={styles.t1Label}>{event.label}</Text>
-      )}
-    </TouchableOpacity>
+    <Animated.View style={[styles.t1ButtonWrapper, { transform: [{ scale }] }]}>
+      <TouchableOpacity
+        style={styles.t1Button}
+        onPress={() => { triggerRipple(); onPress(event, teamId) }}
+        activeOpacity={1}
+        accessibilityLabel={event.label}
+        accessibilityRole="button"
+      >
+        {isYellowCard ? (
+          <YellowCard />
+        ) : isRedCard ? (
+          <RedCard />
+        ) : isWicket ? (
+          <StumpsIcon size={32} />
+        ) : (
+          <Text style={styles.t1Label}>{event.label}</Text>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   )
 }
 
 function T2Button({ event, teamId, onPress }: ButtonProps) {
   const isYellowCard = event.id === 'yellow_card'
   const isRedCard = event.id === 'red_card'
-
   const bgColour = isRedCard ? '#3D0A0F' : isYellowCard ? '#3D2E00' : '#2A2214'
+  const { scale, triggerRipple } = useRipple()
 
   return (
-    <TouchableOpacity
-      style={[styles.t2Button, { backgroundColor: bgColour }]}
-      onPress={() => onPress(event, teamId)}
-      activeOpacity={0.7}
-      accessibilityLabel={event.label}
-      accessibilityRole="button"
-    >
-      {isYellowCard ? (
-        <YellowCard />
-      ) : isRedCard ? (
-        <RedCard />
-      ) : (
-        <Text style={styles.t2Label}>{event.label}</Text>
-      )}
-    </TouchableOpacity>
+    <Animated.View style={[styles.t2ButtonWrapper, { transform: [{ scale }] }]}>
+      <TouchableOpacity
+        style={[styles.t2Button, { backgroundColor: bgColour }]}
+        onPress={() => { triggerRipple(); onPress(event, teamId) }}
+        activeOpacity={1}
+        accessibilityLabel={event.label}
+        accessibilityRole="button"
+      >
+        {isYellowCard ? (
+          <YellowCard />
+        ) : isRedCard ? (
+          <RedCard />
+        ) : (
+          <Text style={styles.t2Label}>{event.label}</Text>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   )
 }
 
 function T3Button({ event, teamId, onPress }: ButtonProps) {
+  const { scale, triggerRipple } = useRipple()
+
   return (
-    <TouchableOpacity
-      style={styles.t3Button}
-      onPress={() => onPress(event, teamId)}
-      activeOpacity={0.7}
-      accessibilityLabel={event.tip ?? event.label}
-      accessibilityRole="button"
-    >
-      <Text style={styles.t3Label}>{event.label}</Text>
-    </TouchableOpacity>
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TouchableOpacity
+        style={styles.t3Button}
+        onPress={() => { triggerRipple(); onPress(event, teamId) }}
+        activeOpacity={1}
+        accessibilityLabel={event.tip ?? event.label}
+        accessibilityRole="button"
+      >
+        <Text style={styles.t3Label}>{event.label}</Text>
+      </TouchableOpacity>
+    </Animated.View>
   )
 }
 
@@ -139,11 +165,13 @@ interface EventButtonsProps {
   teamId: string
   /** Called when any event button is tapped. Wires to Firestore write in #30. */
   onEventTap: (event: SportEvent, teamId: string) => void
+  /** Called additionally when a scoring event (scoreDelta != null) is tapped. Triggers score flash in sk-live. */
+  onScoringTap?: () => void
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function EventButtons({ sportKey, teamId, onEventTap }: EventButtonsProps) {
+export function EventButtons({ sportKey, teamId, onEventTap, onScoringTap }: EventButtonsProps) {
   const config = eventConfig[sportKey] ?? eventConfig.custom
   const t1Events = config.events.filter((e) => e.tier === 1)
   const t2Events = config.events.filter((e) => e.tier === 2)
@@ -152,8 +180,11 @@ export function EventButtons({ sportKey, teamId, onEventTap }: EventButtonsProps
   const handlePress = useCallback(
     (event: SportEvent, tId: string) => {
       onEventTap(event, tId)
+      if (event.scoreDelta !== null && onScoringTap) {
+        onScoringTap()
+      }
     },
-    [onEventTap],
+    [onEventTap, onScoringTap],
   )
 
   return (
@@ -201,6 +232,7 @@ const styles = StyleSheet.create({
     gap: 6,
     flex: 2,
   },
+  t1ButtonWrapper: { flex: 1 },
   t1Button: {
     flex: 1,
     minHeight: 56,
@@ -223,6 +255,7 @@ const styles = StyleSheet.create({
     gap: 6,
     flex: 1,
   },
+  t2ButtonWrapper: { flex: 1 },
   t2Button: {
     flex: 1,
     minHeight: 48,
