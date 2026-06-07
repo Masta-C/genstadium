@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { AttributionSheet } from '../../components/AttributionSheet'
 import { EventButtons } from '../../components/EventButtons'
 import { auth, db } from '../../lib/firebase/client'
 
@@ -18,16 +19,49 @@ interface Team {
   colour: string
 }
 
+interface Player {
+  id: string
+  teamId: string
+  jerseyNumber: string
+  name: string
+  position: string
+}
+
 interface ScoreState {
   homeScore: number
   awayScore: number
   period: string
 }
 
+interface PendingAttribution {
+  eventId: string
+  teamId: string
+  eventLabel: string
+  eventEmoji: string
+}
+
+const EVENT_EMOJIS: Record<string, string> = {
+  goal: '⚽',
+  own_goal: '⚽',
+  touchdown: '🏈',
+  field_goal: '🏈',
+  six: '🏏',
+  four: '🏏',
+  wicket: '🏏',
+  points_3: '🏀',
+  points_2: '🏀',
+  points_1: '🏀',
+  foul: '🟨',
+  yellow_card: '🟨',
+  red_card: '🟥',
+  fault: '❌',
+}
+
 export default function SkLiveScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>()
 
   const [teams, setTeams] = useState<Team[]>([])
+  const [players, setPlayers] = useState<Player[]>([])
   const [sportKey, setSportKey] = useState<SportKey>('soccer')
   const [scoreState, setScoreState] = useState<ScoreState>({
     homeScore: 0,
@@ -35,6 +69,7 @@ export default function SkLiveScreen() {
     period: '1st',
   })
   const [lastEventLabel, setLastEventLabel] = useState('No events yet')
+  const [pendingAttribution, setPendingAttribution] = useState<PendingAttribution | null>(null)
   const unsubRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
@@ -51,6 +86,7 @@ export default function SkLiveScreen() {
       if (snap.exists()) {
         const data = snap.data()
         setTeams((data.teams as Team[]) ?? [])
+        setPlayers((data.players as Player[]) ?? [])
         setSportKey((data.eventType as SportKey) ?? 'soccer')
       }
     })
@@ -77,7 +113,7 @@ export default function SkLiveScreen() {
 
   /**
    * Writes a score event to sessions/{sessionId}/events/{eventId}.
-   * Event registers instantly — playerId starts null, filled by attribution sheet (#32).
+   * Event registers instantly — playerId starts null, filled by attribution sheet within 8s.
    * Score flash animation wired in #36.
    */
   const handleEventTap = useCallback(
@@ -89,17 +125,26 @@ export default function SkLiveScreen() {
       addDoc(collection(db, 'sessions', sessionId, 'events'), {
         eventType: event.id,
         team: teamId,
-        playerId: null,           // filled by attribution sheet within 8s (#32)
+        playerId: null,
         scoreDelta: event.scoreDelta,
         metadata: {},
         timestamp: serverTimestamp(),
         loggedBy: uid,
+      }).then((docRef) => {
+        // Open attribution sheet after write — only if event expects playerId
+        if (event.metadata.includes('playerId')) {
+          setPendingAttribution({
+            eventId: docRef.id,
+            teamId,
+            eventLabel: event.label,
+            eventEmoji: EVENT_EMOJIS[event.id] ?? '📌',
+          })
+        }
       }).catch(() => {
         // Silent failure — event may retry or SK can undo (#35)
       })
 
       setLastEventLabel(event.label)
-      // Attribution sheet (#32) opens here after write
     },
     [sessionId],
   )
@@ -181,6 +226,19 @@ export default function SkLiveScreen() {
           <Text style={styles.logButtonText}>📋 Log</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Attribution sheet — overlays the screen, never blocks score */}
+      {pendingAttribution && sessionId ? (
+        <AttributionSheet
+          sessionId={sessionId}
+          eventId={pendingAttribution.eventId}
+          teamId={pendingAttribution.teamId}
+          eventLabel={pendingAttribution.eventLabel}
+          eventEmoji={pendingAttribution.eventEmoji}
+          players={players}
+          onDismiss={() => setPendingAttribution(null)}
+        />
+      ) : null}
     </View>
   )
 }
