@@ -22,5 +22,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   setUser: (user) => set({ user }),
   setRole: (role) => set({ role }),
   setLoading: (loading) => set({ loading }),
+  // Clears local state — caller is responsible for calling Firebase signOut()
+  // and then navigating to login (root layout handles redirect automatically
+  // via the user=null guard).
   signOut: () => set({ user: null, role: null, loading: false }),
 }))
