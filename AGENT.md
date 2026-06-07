@@ -10,23 +10,25 @@
 Check context window size at the **start** of each iteration (before Step 0) and **after** filing a PR (after Step 6.5).
 
 ### If context is at yellow (warning):
-1. Run `/compact` to compress the conversation.
+1. Invoke the `compact` slash command (`/compact`) to compress the conversation.
 2. Continue the current iteration normally.
 
 ### If context is at orange/red, or if `/compact` fails to bring it back to green:
-1. Run the `/handoff` skill to generate a structured handoff document.
-   - Include: what was built this session, current git branch state, which issue to pick next, any stash or partial work, open PR URLs.
+1. Invoke the `/handoff` skill to generate a structured handoff document.
+   - The handoff MUST include: what was built this session, current git branch and stash state, which issue to pick next, all open PR URLs with CI status, and the rebase pattern note (rebase onto `fix/ci-emulator-agentmd-ci-check` until #113 merges).
+   - Save to `mktemp -t handoff-XXXXXX.md` and capture the path.
 2. Output exactly:
    ```
-   HANDOFF: context limit reached — handoff created at {path}
-   Starting next issue in a new session.
+   HANDOFF: context limit reached — handoff at {path}
+   Scheduling next iteration automatically.
    ```
-3. Start a **new loop session** with the handoff doc as context:
-   ```
-   /loop Read {handoff_path} then read AGENT.md at /Users/chetanpatil/genstadium/AGENT.md and execute one full Ralph Loop iteration for the GenStadium repo at /Users/chetanpatil/genstadium
-   ```
+3. **Immediately call `ScheduleWakeup`** with:
+   - `delaySeconds: 60` (minimum allowed — gives current session time to flush)
+   - `prompt`: `/loop Read {handoff_path} then read AGENT.md at /Users/chetanpatil/genstadium/AGENT.md and execute one full Ralph Loop iteration for the GenStadium repo at /Users/chetanpatil/genstadium`
+   - `reason`: `"Ralph Loop handoff — continuing from context limit in fresh window"`
+4. Do NOT wait or do anything else after calling `ScheduleWakeup`. The new wakeup carries the loop forward.
 
-**Never let a full context window cause lost work or an incomplete issue.** The handoff is the safety net.
+**Never let a full context window cause lost work or an incomplete issue. The handoff + ScheduleWakeup is fully automatic — no human action required.**
 
 ---
 
