@@ -1,7 +1,7 @@
 import type { SportEvent, SportKey } from '@genstadium/event-config'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as ScreenOrientation from 'expo-screen-orientation'
-import { doc, getDoc, onSnapshot } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   StyleSheet,
@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native'
 import { EventButtons } from '../../components/EventButtons'
-import { db } from '../../lib/firebase/client'
+import { auth, db } from '../../lib/firebase/client'
 
 interface Team {
   id: string
@@ -34,7 +34,7 @@ export default function SkLiveScreen() {
     awayScore: 0,
     period: '1st',
   })
-  const [lastEventLabel] = useState('No events yet')
+  const [lastEventLabel, setLastEventLabel] = useState('No events yet')
   const unsubRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
@@ -75,10 +75,34 @@ export default function SkLiveScreen() {
   const teamA = teams[0]
   const teamB = teams[1]
 
-  // Wired to Firestore event write in #30. Score flash animation in #36.
-  const handleEventTap = useCallback((_event: SportEvent, _teamId: string) => {
-    // TODO(#30): write event to sessions/{sessionId}/events/{eventId}
-  }, [])
+  /**
+   * Writes a score event to sessions/{sessionId}/events/{eventId}.
+   * Event registers instantly — playerId starts null, filled by attribution sheet (#32).
+   * Score flash animation wired in #36.
+   */
+  const handleEventTap = useCallback(
+    (event: SportEvent, teamId: string) => {
+      const uid = auth.currentUser?.uid
+      if (!sessionId || !uid) return
+
+      // Fire-and-forget write — score must register instantly on broadcast
+      addDoc(collection(db, 'sessions', sessionId, 'events'), {
+        eventType: event.id,
+        team: teamId,
+        playerId: null,           // filled by attribution sheet within 8s (#32)
+        scoreDelta: event.scoreDelta,
+        metadata: {},
+        timestamp: serverTimestamp(),
+        loggedBy: uid,
+      }).catch(() => {
+        // Silent failure — event may retry or SK can undo (#35)
+      })
+
+      setLastEventLabel(event.label)
+      // Attribution sheet (#32) opens here after write
+    },
+    [sessionId],
+  )
 
   return (
     <View style={styles.container}>
