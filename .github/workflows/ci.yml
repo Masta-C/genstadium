@@ -21,6 +21,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Setup Java 21 (required by Firebase emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
       - name: Typecheck (all workspaces)
         run: npm run typecheck
 
@@ -30,8 +36,23 @@ jobs:
       - name: Unit tests — Cloud Run
         run: npm test --workspace=cloud-run
 
+      # The Firestore rules tests require a live emulator.
+      # firebase-tools is bundled with the repo devDependencies so no global install needed.
+      # We start only the Firestore emulator (auth not required for rules unit tests).
+      - name: Start Firestore emulator
+        run: |
+          npx firebase emulators:start --only firestore --project genstadium-2321 &
+          echo "EMULATOR_PID=$!" >> $GITHUB_ENV
+          npx wait-on tcp:8080 --timeout 30000
+
       - name: Unit tests — Firestore rules
         run: npm run test:rules --workspace=cloud-run
+        env:
+          FIRESTORE_EMULATOR_HOST: localhost:8080
+
+      - name: Stop Firestore emulator
+        if: always()
+        run: kill $EMULATOR_PID || true
 
       - name: Unit tests — App
         run: npm test --workspace=app

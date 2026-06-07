@@ -5,6 +5,48 @@
 
 ---
 
+## Context Management — runs before every iteration
+
+Check context window size at the **start** of each iteration (before Step 0) and **after** filing a PR (after Step 6.5).
+
+### If context is at yellow (warning):
+1. Invoke the `compact` slash command (`/compact`) to compress the conversation.
+2. Continue the current iteration normally.
+
+### If context is at orange/red, or if `/compact` fails to bring it back to green:
+1. Invoke the `/handoff` skill to generate a structured handoff document.
+   - The handoff MUST include: what was built this session, current git branch and stash state, which issue to pick next, all open PR URLs with CI status, and the rebase pattern note.
+   - Save to `mktemp -t handoff-XXXXXX.md` and capture the path.
+2. Output exactly:
+   ```
+   HANDOFF: context limit reached — handoff at {path}
+   Starting fresh session automatically.
+   ```
+3. Print this exact block and stop — one human action (open new tab + paste) is required:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RALPH LOOP PAUSED — context window full
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Open a NEW Claude Code tab and run:
+
+/loop Read {handoff_path} then read AGENT.md at /Users/chetanpatil/genstadium/AGENT.md and execute one full Ralph Loop iteration for the GenStadium repo at /Users/chetanpatil/genstadium
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+4. Do nothing else. This session is done.
+
+**Why one human click is unavoidable:** There is no mechanism to auto-spawn a new *local* Claude Code session from within a running one:
+- `ScheduleWakeup` — re-invokes the SAME session. Context still full.
+- `Agent` — subagent within the SAME session. Context still held.
+- `/schedule` — cloud session; cannot access local files or run local tools.
+
+The handoff doc preserves all state. Opening a new tab takes 2 seconds.
+
+**Never let a full context window cause lost work. The handoff captures everything — the human just opens a new tab.**
+
+---
+
 ## Step 0 — Orient (tiered — load only what you need)
 
 ### Always load (every iteration)
@@ -148,6 +190,30 @@ Closes #{N}
 EOF
 )"
 ```
+
+---
+
+## Step 6.5 — Wait for CI
+
+After `gh pr create`, wait for GitHub Actions CI to complete before proceeding.
+
+```bash
+# Poll until all checks are non-pending (pass or fail). Timeout after 5 minutes.
+gh pr checks {PR_URL} --repo Masta-C/genstadium --watch --interval 15 --timeout 300
+```
+
+If CI **passes** → continue to Step 7.
+
+If CI **fails**:
+1. Fetch the failure log: `gh run view {run_id} --repo Masta-C/genstadium --log-failed | head -80`
+2. Identify the failing step. Fix the issue on the current feature branch.
+3. Push the fix: `git add {files} && git commit -m "fix(#{N}): ..." && git push`
+4. Go back to the top of Step 6.5 and re-watch.
+5. Maximum 3 fix attempts.
+
+If CI still fails after 3 fix attempts → output `STUCK: #{N} — {exact CI error}` and stop.
+
+**Never proceed to Step 7 with a red CI.**
 
 ---
 
