@@ -1,13 +1,15 @@
+import type { SportEvent, SportKey } from '@genstadium/event-config'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as ScreenOrientation from 'expo-screen-orientation'
 import { doc, getDoc, onSnapshot } from 'firebase/firestore'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import { EventButtons } from '../../components/EventButtons'
 import { db } from '../../lib/firebase/client'
 
 interface Team {
@@ -26,6 +28,7 @@ export default function SkLiveScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>()
 
   const [teams, setTeams] = useState<Team[]>([])
+  const [sportKey, setSportKey] = useState<SportKey>('soccer')
   const [scoreState, setScoreState] = useState<ScoreState>({
     homeScore: 0,
     awayScore: 0,
@@ -46,7 +49,9 @@ export default function SkLiveScreen() {
 
     getDoc(doc(db, 'sessions', sessionId)).then((snap) => {
       if (snap.exists()) {
-        setTeams((snap.data().teams as Team[]) ?? [])
+        const data = snap.data()
+        setTeams((data.teams as Team[]) ?? [])
+        setSportKey((data.eventType as SportKey) ?? 'soccer')
       }
     })
 
@@ -69,6 +74,11 @@ export default function SkLiveScreen() {
 
   const teamA = teams[0]
   const teamB = teams[1]
+
+  // Wired to Firestore event write in #30. Score flash animation in #36.
+  const handleEventTap = useCallback((_event: SportEvent, _teamId: string) => {
+    // TODO(#30): write event to sessions/{sessionId}/events/{eventId}
+  }, [])
 
   return (
     <View style={styles.container}>
@@ -107,7 +117,11 @@ export default function SkLiveScreen() {
           <Text style={[styles.panelHeading, teamA && { color: teamA.colour }]}>
             {teamA?.name ?? 'Team A'}
           </Text>
-          {/* Event buttons added in issue #28 */}
+          <EventButtons
+            sportKey={sportKey}
+            teamId={teamA?.id ?? 'team-a'}
+            onEventTap={handleEventTap}
+          />
         </View>
 
         <View style={styles.divider} />
@@ -117,7 +131,11 @@ export default function SkLiveScreen() {
           <Text style={[styles.panelHeading, teamB && { color: teamB.colour }]}>
             {teamB?.name ?? 'Team B'}
           </Text>
-          {/* Event buttons added in issue #28 */}
+          <EventButtons
+            sportKey={sportKey}
+            teamId={teamB?.id ?? 'team-b'}
+            onEventTap={handleEventTap}
+          />
         </View>
       </View>
 
