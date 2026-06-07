@@ -5,6 +5,7 @@
   "workspaces": [
     "app",
     "cloud-run",
+    "functions",
     "graphics",
     "packages/*"
   ],

@@ -213,7 +213,36 @@ If CI **fails**:
 
 If CI still fails after 3 fix attempts → output `STUCK: #{N} — {exact CI error}` and stop.
 
-**Never proceed to Step 7 with a red CI.**
+**Never proceed to Step 6.6 with a red CI.**
+
+---
+
+## Step 6.6 — Merge immediately
+
+CI is green. Merge the PR right now — do not leave it open.
+
+```bash
+gh pr merge {PR_URL} \
+  --repo Masta-C/genstadium \
+  --squash \
+  --admin \
+  --delete-branch
+```
+
+Then pull develop locally so the next branch starts from the freshly merged state:
+
+```bash
+git checkout develop
+git pull origin develop
+```
+
+**Why merge immediately:**
+Leaving PRs open causes stacked rebase conflicts when merging later. Every PR that sits open is a branch that diverges further from develop with each subsequent merge. Merge-on-green keeps develop as the single source of truth and eliminates the entire class of "14 PRs with merge conflicts" problems.
+
+If the merge fails (e.g. branch protection requires a human review):
+- Note the PR URL in the session log
+- Continue to Step 7 — but flag it: `NOTE: PR #{N} open, needs manual merge`
+- On the NEXT iteration, check if it merged before branching
 
 ---
 
@@ -259,9 +288,14 @@ NEXT: ready for next iteration
 
 ---
 
+## What this agent always does
+
+- **Merges the PR immediately after CI goes green** (Step 6.6) — never leaves PRs open to accumulate
+
 ## What this agent never does
 
 - Never pushes to `main` or `develop` directly — PRs only
+- Never leaves a PR open after CI is green — merge it before picking the next issue
 - Never skips typecheck, lint, or tests
 - Never uses `// @ts-ignore` without a comment explaining why
 - Never modifies `firestore.rules` without also updating the relevant test
