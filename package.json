@@ -2,7 +2,12 @@
   "name": "genstadium",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["app", "cloud-run", "graphics", "packages/*"],
+  "workspaces": [
+    "app",
+    "cloud-run",
+    "graphics",
+    "packages/*"
+  ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
@@ -13,8 +18,10 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "firebase-admin": "^12.0.0",
+    "firebase-tools": "^15.19.1",
     "prettier": "^3.3.0",
     "ts-node": "^10.9.0",
-    "typescript": "~5.7.0"
+    "typescript": "~5.7.0",
+    "wait-on": "^9.0.10"
   }
 }

@@ -151,6 +151,30 @@ EOF
 
 ---
 
+## Step 6.5 — Wait for CI
+
+After `gh pr create`, wait for GitHub Actions CI to complete before proceeding.
+
+```bash
+# Poll until all checks are non-pending (pass or fail). Timeout after 5 minutes.
+gh pr checks {PR_URL} --repo Masta-C/genstadium --watch --interval 15 --timeout 300
+```
+
+If CI **passes** → continue to Step 7.
+
+If CI **fails**:
+1. Fetch the failure log: `gh run view {run_id} --repo Masta-C/genstadium --log-failed | head -80`
+2. Identify the failing step. Fix the issue on the current feature branch.
+3. Push the fix: `git add {files} && git commit -m "fix(#{N}): ..." && git push`
+4. Go back to the top of Step 6.5 and re-watch.
+5. Maximum 3 fix attempts.
+
+If CI still fails after 3 fix attempts → output `STUCK: #{N} — {exact CI error}` and stop.
+
+**Never proceed to Step 7 with a red CI.**
+
+---
+
 ## Step 7 — Comment on the issue
 
 ```bash
