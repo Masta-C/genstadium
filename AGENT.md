@@ -97,6 +97,18 @@ All three must pass. If any fail:
 
 If still failing after 3 attempts → output `STUCK: #{N} — {exact error}` and stop. Do not create a PR with failing checks.
 
+**Extra check — test files outside workspace `src/` directories:**
+If you added any test files (e.g. `tests/*.test.ts` at repo root, or files outside a workspace's `include` paths), verify they are covered by a tsconfig that CI will actually run. The default workspace typecheck only covers `src/**/*.ts`. Pattern:
+
+```bash
+# If a jest config uses a custom tsconfig (e.g. tsconfig.rules.json), typecheck it explicitly:
+npx tsc --noEmit -p cloud-run/tsconfig.rules.json
+# Or run the workspace script if it exists:
+npm run typecheck:rules --workspace=cloud-run
+```
+
+**Why this matters:** A test file that compiles fine in isolation may fail in CI if the jest config's tsconfig has `rootDir` set to a subdirectory, or if `@types/jest` is not in scope for that tsconfig. Always run the exact tsc config the jest runner will use — not just the workspace default.
+
 ---
 
 ## Step 6 — Commit and PR
