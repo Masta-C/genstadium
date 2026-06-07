@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { AttributionSheet } from '../../components/AttributionSheet'
 import { EventButtons } from '../../components/EventButtons'
+import { OnboardingOverlay, shouldShowOnboarding } from '../../components/OnboardingOverlay'
 import { auth, db } from '../../lib/firebase/client'
 
 interface Team {
@@ -72,6 +73,7 @@ export default function SkLiveScreen() {
   const [lastEventLabel, setLastEventLabel] = useState('No events yet')
   const [pendingAttribution, setPendingAttribution] = useState<PendingAttribution | null>(null)
   const [lastEventId, setLastEventId] = useState<string | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const scoreFlashScale = useRef(new Animated.Value(1)).current
   const unsubRef = useRef<(() => void) | null>(null)
 
@@ -80,6 +82,13 @@ export default function SkLiveScreen() {
     return () => {
       ScreenOrientation.unlockAsync()
     }
+  }, [])
+
+  // Show onboarding overlay first time Score Keeper reaches the live screen
+  useEffect(() => {
+    shouldShowOnboarding().then((show) => {
+      if (show) setShowOnboarding(true)
+    })
   }, [])
 
   useEffect(() => {
@@ -271,6 +280,11 @@ export default function SkLiveScreen() {
           <Text style={styles.logButtonText}>📋 Log</Text>
         </TouchableOpacity>
       </View>
+
+      {/* First-session onboarding overlay — dismissed state persisted to AsyncStorage */}
+      {showOnboarding ? (
+        <OnboardingOverlay onDismiss={() => setShowOnboarding(false)} />
+      ) : null}
 
       {/* Attribution sheet — overlays the screen, never blocks score */}
       {pendingAttribution && sessionId ? (
