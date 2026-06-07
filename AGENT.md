@@ -5,6 +5,31 @@
 
 ---
 
+## Context Management — runs before every iteration
+
+Check context window size at the **start** of each iteration (before Step 0) and **after** filing a PR (after Step 6.5).
+
+### If context is at yellow (warning):
+1. Run `/compact` to compress the conversation.
+2. Continue the current iteration normally.
+
+### If context is at orange/red, or if `/compact` fails to bring it back to green:
+1. Run the `/handoff` skill to generate a structured handoff document.
+   - Include: what was built this session, current git branch state, which issue to pick next, any stash or partial work, open PR URLs.
+2. Output exactly:
+   ```
+   HANDOFF: context limit reached — handoff created at {path}
+   Starting next issue in a new session.
+   ```
+3. Start a **new loop session** with the handoff doc as context:
+   ```
+   /loop Read {handoff_path} then read AGENT.md at /Users/chetanpatil/genstadium/AGENT.md and execute one full Ralph Loop iteration for the GenStadium repo at /Users/chetanpatil/genstadium
+   ```
+
+**Never let a full context window cause lost work or an incomplete issue.** The handoff is the safety net.
+
+---
+
 ## Step 0 — Orient (tiered — load only what you need)
 
 ### Always load (every iteration)
