@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import { z } from 'zod'
 import { auth } from '../../lib/firebase/client'
+import { signInWithGoogle } from '../../lib/firebase/googleSignIn'
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -24,6 +25,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
 
   async function handleSignIn() {
     setErrors({})
@@ -37,7 +39,6 @@ export default function LoginScreen() {
       setErrors(fieldErrors)
       return
     }
-
     setLoading(true)
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password)
@@ -53,6 +54,24 @@ export default function LoginScreen() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setErrors({})
+    setGoogleLoading(true)
+    try {
+      await signInWithGoogle()
+      router.replace('/(director)/home')
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code ?? ''
+      if (code === 'LINK_REQUIRED') {
+        setErrors({ form: 'This email is registered with a password. Sign in with email instead.' })
+      } else if (code !== 'SIGN_IN_CANCELLED' && code !== 'IN_PROGRESS') {
+        setErrors({ form: 'Google Sign-In failed. Try again.' })
+      }
+    } finally {
+      setGoogleLoading(false)
     }
   }
 
@@ -95,13 +114,33 @@ export default function LoginScreen() {
         <TouchableOpacity
           style={[styles.primaryButton, loading && styles.buttonDisabled]}
           onPress={handleSignIn}
-          disabled={loading}
+          disabled={loading || googleLoading}
           activeOpacity={0.8}
         >
           {loading ? (
             <ActivityIndicator color="#121212" />
           ) : (
             <Text style={styles.primaryButtonText}>Sign in</Text>
+          )}
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* Google Sign-In — requires dev build, not Expo Go */}
+        <TouchableOpacity
+          style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
+          onPress={handleGoogleSignIn}
+          disabled={loading || googleLoading}
+          activeOpacity={0.8}
+        >
+          {googleLoading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.googleButtonText}>🔵  Continue with Google</Text>
           )}
         </TouchableOpacity>
 
@@ -147,9 +186,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginBottom: 4,
   },
-  inputError: {
-    borderColor: '#E91429',
-  },
+  inputError: { borderColor: '#E91429' },
   fieldError: {
     color: '#E91429',
     fontSize: 13,
@@ -170,13 +207,42 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 16,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   buttonDisabled: { opacity: 0.6 },
   primaryButtonText: {
     color: '#121212',
     fontSize: 16,
     fontWeight: '700',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#2A2A2A',
+  },
+  dividerText: {
+    color: '#535353',
+    fontSize: 13,
+    marginHorizontal: 12,
+  },
+  googleButton: {
+    backgroundColor: '#1E1E1E',
+    borderWidth: 1,
+    borderColor: '#3A3A3A',
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  googleButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   switchText: {
     color: '#B3B3B3',

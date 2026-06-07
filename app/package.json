@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@genstadium/event-config": "*",
+    "@react-native-google-signin/google-signin": "^13.0.0",
     "expo-clipboard": "~7.0.0",
     "expo": "~52.0.0",
     "expo-router": "~4.0.0",
