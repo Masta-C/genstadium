@@ -4,6 +4,7 @@ import * as ScreenOrientation from 'expo-screen-orientation'
 import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -71,6 +72,7 @@ export default function SkLiveScreen() {
   const [lastEventLabel, setLastEventLabel] = useState('No events yet')
   const [pendingAttribution, setPendingAttribution] = useState<PendingAttribution | null>(null)
   const [lastEventId, setLastEventId] = useState<string | null>(null)
+  const scoreFlashScale = useRef(new Animated.Value(1)).current
   const unsubRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
@@ -156,6 +158,28 @@ export default function SkLiveScreen() {
    * scoreStateAggregator already skips deleted events — score corrects silently.
    * Score Keeper only — Director cannot modify events.
    */
+  /**
+   * Score flash: scale 1 → 1.3 → 1 in ~300ms spring.
+   * Fires on scoring taps only (scoreDelta != null). Does not block next tap.
+   */
+  const handleScoringTap = useCallback(() => {
+    scoreFlashScale.setValue(1)
+    Animated.sequence([
+      Animated.spring(scoreFlashScale, {
+        toValue: 1.3,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      }),
+      Animated.spring(scoreFlashScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      }),
+    ]).start()
+  }, [scoreFlashScale])
+
   const handleUndo = useCallback(() => {
     if (!sessionId || !lastEventId) return
     updateDoc(doc(db, 'sessions', sessionId, 'events', lastEventId), {
@@ -185,9 +209,9 @@ export default function SkLiveScreen() {
               {teamA.name}
             </Text>
           ) : null}
-          <Text style={styles.score}>
+          <Animated.Text style={[styles.score, { transform: [{ scale: scoreFlashScale }] }]}>
             {scoreState.homeScore} – {scoreState.awayScore}
-          </Text>
+          </Animated.Text>
           {teamB ? (
             <Text style={[styles.teamScoreLabel, { color: teamB.colour }]} numberOfLines={1}>
               {teamB.name}
@@ -209,6 +233,7 @@ export default function SkLiveScreen() {
             sportKey={sportKey}
             teamId={teamA?.id ?? 'team-a'}
             onEventTap={handleEventTap}
+            onScoringTap={handleScoringTap}
           />
         </View>
 
@@ -223,6 +248,7 @@ export default function SkLiveScreen() {
             sportKey={sportKey}
             teamId={teamB?.id ?? 'team-b'}
             onEventTap={handleEventTap}
+            onScoringTap={handleScoringTap}
           />
         </View>
       </View>
