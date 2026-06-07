@@ -6,6 +6,6 @@ module.exports = {
   rootDir: '../',
   testMatch: ['**/tests/firestore.rules.test.ts'],
   transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/cloud-run/tsconfig.json' }],
+    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/cloud-run/tsconfig.rules.json' }],
   },
 }
