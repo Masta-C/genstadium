@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native'
 import { AttributionSheet } from '../../components/AttributionSheet'
+import { CricketPanel } from '../../components/CricketPanel'
 import { EventButtons } from '../../components/EventButtons'
 import { OnboardingOverlay, shouldShowOnboarding } from '../../components/OnboardingOverlay'
 import { auth, db } from '../../lib/firebase/client'
@@ -65,6 +66,7 @@ export default function SkLiveScreen() {
   const [teams, setTeams] = useState<Team[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [sportKey, setSportKey] = useState<SportKey>('soccer')
+  const [whoGoesFirst, setWhoGoesFirst] = useState('')
   const [scoreState, setScoreState] = useState<ScoreState>({
     homeScore: 0,
     awayScore: 0,
@@ -100,6 +102,7 @@ export default function SkLiveScreen() {
         setTeams((data.teams as Team[]) ?? [])
         setPlayers((data.players as Player[]) ?? [])
         setSportKey((data.eventType as SportKey) ?? 'soccer')
+        setWhoGoesFirst((data.whoGoesFirst as string) ?? '')
       }
     })
 
@@ -231,35 +234,51 @@ export default function SkLiveScreen() {
         <View style={styles.topBarRight} />
       </View>
 
-      {/* Main panels */}
+      {/* Main panels — cricket uses single full-width panel */}
       <View style={styles.panels}>
-        {/* Team A panel */}
-        <View style={[styles.panel, teamA && { borderTopColor: teamA.colour }]}>
-          <Text style={[styles.panelHeading, teamA && { color: teamA.colour }]}>
-            {teamA?.name ?? 'Team A'}
-          </Text>
-          <EventButtons
-            sportKey={sportKey}
-            teamId={teamA?.id ?? 'team-a'}
+        {sportKey === 'cricket' && sessionId ? (
+          <CricketPanel
+            sessionId={sessionId}
+            teams={teams}
+            players={players}
+            whoGoesFirst={whoGoesFirst}
             onEventTap={handleEventTap}
             onScoringTap={handleScoringTap}
+            scoreFlashScale={scoreFlashScale}
+            homeScore={scoreState.homeScore}
+            awayScore={scoreState.awayScore}
           />
-        </View>
+        ) : (
+          <>
+            {/* Team A panel */}
+            <View style={[styles.panel, teamA && { borderTopColor: teamA.colour }]}>
+              <Text style={[styles.panelHeading, teamA && { color: teamA.colour }]}>
+                {teamA?.name ?? 'Team A'}
+              </Text>
+              <EventButtons
+                sportKey={sportKey}
+                teamId={teamA?.id ?? 'team-a'}
+                onEventTap={handleEventTap}
+                onScoringTap={handleScoringTap}
+              />
+            </View>
 
-        <View style={styles.divider} />
+            <View style={styles.divider} />
 
-        {/* Team B panel */}
-        <View style={[styles.panel, teamB && { borderTopColor: teamB.colour }]}>
-          <Text style={[styles.panelHeading, teamB && { color: teamB.colour }]}>
-            {teamB?.name ?? 'Team B'}
-          </Text>
-          <EventButtons
-            sportKey={sportKey}
-            teamId={teamB?.id ?? 'team-b'}
-            onEventTap={handleEventTap}
-            onScoringTap={handleScoringTap}
-          />
-        </View>
+            {/* Team B panel */}
+            <View style={[styles.panel, teamB && { borderTopColor: teamB.colour }]}>
+              <Text style={[styles.panelHeading, teamB && { color: teamB.colour }]}>
+                {teamB?.name ?? 'Team B'}
+              </Text>
+              <EventButtons
+                sportKey={sportKey}
+                teamId={teamB?.id ?? 'team-b'}
+                onEventTap={handleEventTap}
+                onScoringTap={handleScoringTap}
+              />
+            </View>
+          </>
+        )}
       </View>
 
       {/* Undo bar */}
