@@ -127,21 +127,40 @@ export default function SkEndedScreen() {
   const sportMeta = `${sport.icon} ${sport.displayName}${scoreState.period ? ` · ${scoreState.period}` : ''}`
 
   async function handleShareRecap() {
+    const teamA = teams[0]
+    const teamB = teams[1]
     const teamALine = teamA ? `${teamA.name}: ${scoreState.homeScore}` : `Team A: ${scoreState.homeScore}`
     const teamBLine = teamB ? `${teamB.name}: ${scoreState.awayScore}` : `Team B: ${scoreState.awayScore}`
-    const message = [
+    const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+
+    // Top events — scoring plays attributed to a player
+    const SCORING_EVENTS = new Set(['goal', 'touchdown', 'field_goal', 'six', 'four', 'wicket', 'points_3', 'points_2'])
+    const topEvents = events
+      .filter((e) => SCORING_EVENTS.has(e.eventType) && !e.metadata?.deleted)
+      .slice(0, 5)
+      .map((e) => {
+        const team = teams.find((t) => t.id === e.team)
+        const player = e.playerId && e.playerId !== 'Unknown' ? ` (${e.playerId})` : ''
+        return `  • ${e.eventType.replace(/_/g, ' ')}${player} — ${team?.name ?? '?'}`
+      })
+
+    const lines = [
       `📊 Match Recap — ${sport.displayName}`,
+      `📅 ${dateStr}`,
       '',
       teamALine,
       teamBLine,
       '',
-      scoreState.period ? `Final: ${scoreState.period}` : 'Final',
-      '',
-      'Powered by GenStadium 📹',
-    ].join('\n')
+      scoreState.period ? `⏱ Final: ${scoreState.period}` : '⏱ Final',
+    ]
+    if (topEvents.length > 0) {
+      lines.push('', '🎯 Key moments:')
+      lines.push(...topEvents)
+    }
+    lines.push('', 'Powered by GenStadium 📹')
 
     try {
-      await Share.share({ message })
+      await Share.share({ message: lines.join('\n') })
     } catch {
       // User cancelled share sheet — silent
     }
