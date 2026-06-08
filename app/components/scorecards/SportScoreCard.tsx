@@ -7,13 +7,14 @@
  *   #42 Basketball → BasketballScoreCard  ✅
  *   #43 American Football → AmFootballScoreCard  ✅
  *   #44 Pickleball → PickleballScoreCard  ✅
- *   #45 Badminton  → BadmintonScoreCard (pending)
+ *   #45 Badminton  → BadmintonScoreCard   ✅
  */
 
 import type { SportKey } from '@genstadium/event-config'
 import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { AmFootballScoreCard } from './AmFootballScoreCard'
+import { BadmintonScoreCard } from './BadmintonScoreCard'
 import { PickleballScoreCard } from './PickleballScoreCard'
 import { BasketballScoreCard } from './BasketballScoreCard'
 import { CricketScoreCard } from './CricketScoreCard'
@@ -92,7 +93,11 @@ export function SportScoreCard({ sportKey, tab, teams, players, events, startedA
     return <PickleballScoreCard tab={tab} teams={teams} events={events} />
   }
 
-  // Remaining sports wired in issue #45
+  if (sportKey === 'badminton') {
+    return <BadmintonScoreCard tab={tab} teams={teams} events={events} />
+  }
+
+  // Custom sport fallback
   return (
     <View style={styles.pending}>
       <Text style={styles.pendingText}>
