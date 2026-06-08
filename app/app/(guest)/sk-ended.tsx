@@ -4,9 +4,8 @@
  * Triggered when session.status transitions to 'ended' via onSnapshot in sk-live.
  * Shows final score, sport meta, tabbed scorecard scaffold, Share Recap, and Done.
  *
- * Scorecard tab content is intentionally left as placeholder rows here.
- * Sport-specific content is wired in subsequent issues:
- *   #40 Soccer · #41 Cricket · #42 Basketball · #43 Am. Football
+ * Sport-specific scorecard content wired in sequentially:
+ *   #40 Soccer ✅ · #41 Cricket · #42 Basketball · #43 Am. Football
  *   #44 Pickleball · #45 Badminton · #46 Share Recap
  */
 
@@ -23,6 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { type MatchEvent, SportScoreCard } from '../../components/scorecards/SportScoreCard'
 import { db } from '../../lib/firebase/client'
 
 interface Team {
@@ -37,14 +37,7 @@ interface ScoreState {
   period: string
 }
 
-interface SessionEvent {
-  id: string
-  eventType: string
-  team: string
-  playerId: string | null
-  scoreDelta: { team: number } | null
-  timestamp: { seconds: number } | null
-}
+// MatchEvent is imported from SportScoreCard (shared type for all scorecard components)
 
 /** Tab labels per sport — content filled in by issues #40–#45 */
 const SPORT_TABS: Record<SportKey, string[]> = {
@@ -63,20 +56,23 @@ export default function SkEndedScreen() {
   const [teams, setTeams] = useState<Team[]>([])
   const [sportKey, setSportKey] = useState<SportKey>('soccer')
   const [scoreState, setScoreState] = useState<ScoreState>({ homeScore: 0, awayScore: 0, period: '' })
-  const [events, setEvents] = useState<SessionEvent[]>([])
+  const [events, setEvents] = useState<MatchEvent[]>([])
+  const [startedAtSeconds, setStartedAtSeconds] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState(0)
   const unsubRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     if (!sessionId) return
 
-    // One-time session read for static fields
+    // Subscribe to session doc for static fields + startedAt for minute calculation
     const sessionRef = doc(db, 'sessions', sessionId)
     const unsub = onSnapshot(sessionRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data()
         setTeams((data.teams as Team[]) ?? [])
         setSportKey((data.eventType as SportKey) ?? 'soccer')
+        const sat = data.startedAt as { seconds: number } | null | undefined
+        if (sat?.seconds) setStartedAtSeconds(sat.seconds)
       }
     })
     unsubRef.current = unsub
@@ -94,11 +90,11 @@ export default function SkEndedScreen() {
       }
     })
 
-    // Load events once for attribution stats
+    // Load events once for scorecard display
     getDocs(collection(db, 'sessions', sessionId, 'events')).then((qs) => {
       const evts = qs.docs
         .filter((d) => !d.data().deleted)
-        .map((d) => ({ id: d.id, ...d.data() } as SessionEvent))
+        .map((d) => ({ id: d.id, ...d.data() } as MatchEvent))
       setEvents(evts)
     }).catch(() => {/* silent */})
 
@@ -200,15 +196,18 @@ export default function SkEndedScreen() {
         ))}
       </View>
 
-      {/* Tab content — sport-specific scorecards wired in #40–#45 */}
-      <ScrollView style={styles.tabContent} contentContainerStyle={styles.tabContentInner}>
-        <ScoreCardPlaceholder
-          tab={tabs[activeTab] ?? ''}
-          sportKey={sportKey}
-          teams={teams}
-          events={events}
-        />
-      </ScrollView>
+      {/* Tab content — sport-specific scorecards */}
+      <View style={styles.tabContent}>
+        <ScrollView contentContainerStyle={styles.tabContentInner}>
+          <SportScoreCard
+            sportKey={sportKey}
+            tab={tabs[activeTab] ?? ''}
+            teams={teams}
+            events={events}
+            startedAtSeconds={startedAtSeconds}
+          />
+        </ScrollView>
+      </View>
 
       {/* Bottom CTAs */}
       <View style={styles.footer}>
@@ -227,56 +226,7 @@ export default function SkEndedScreen() {
   )
 }
 
-/** Placeholder scorecard — replaced by sport-specific components in #40–#45 */
-function ScoreCardPlaceholder({
-  tab,
-  sportKey,
-  teams,
-  events,
-}: {
-  tab: string
-  sportKey: SportKey
-  teams: Team[]
-  events: SessionEvent[]
-}) {
-  // Filter scoring events for a minimal summary
-  const scoringEvents = events.filter((e) => e.scoreDelta !== null && !('deleted' in e))
 
-  if (scoringEvents.length === 0) {
-    return (
-      <View style={styles.emptyState}>
-        <Text style={styles.emptyStateText}>No {tab.toLowerCase()} data recorded</Text>
-      </View>
-    )
-  }
-
-  return (
-    <View>
-      {scoringEvents.map((evt) => {
-        const team = teams.find((t) => t.id === evt.team)
-        const isUnknown = evt.playerId === null || evt.playerId === 'Unknown'
-        return (
-          <View key={evt.id} style={styles.eventRow}>
-            <View style={[styles.eventTeamDot, { backgroundColor: team?.colour ?? '#535353' }]} />
-            <Text style={styles.eventType}>{evt.eventType.replace(/_/g, ' ')}</Text>
-            {isUnknown ? (
-              <View style={styles.unknownPill}>
-                <Text style={styles.unknownPillText}>Unknown</Text>
-              </View>
-            ) : (
-              <Text style={styles.eventPlayer} numberOfLines={1}>
-                {evt.playerId}
-              </Text>
-            )}
-          </View>
-        )
-      })}
-      <Text style={styles.placeholderNote}>
-        ℹ️ Detailed {sportKey} scorecard coming soon
-      </Text>
-    </View>
-  )
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -390,58 +340,6 @@ const styles = StyleSheet.create({
   },
   tabContentInner: {
     padding: 16,
-  },
-  emptyState: {
-    paddingVertical: 48,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    color: '#535353',
-    fontSize: 14,
-  },
-  eventRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 6,
-    gap: 10,
-  },
-  eventTeamDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  eventType: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  unknownPill: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  unknownPillText: {
-    color: '#535353',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  eventPlayer: {
-    color: '#B3B3B3',
-    fontSize: 13,
-    maxWidth: 100,
-  },
-  placeholderNote: {
-    color: '#535353',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 16,
-    paddingBottom: 8,
   },
   // Footer CTAs
   footer: {
