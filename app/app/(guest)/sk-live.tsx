@@ -1,7 +1,7 @@
 import type { SportEvent, SportKey } from '@genstadium/event-config'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as ScreenOrientation from 'expo-screen-orientation'
-import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore'
+import { addDoc, collection, doc, onSnapshot, serverTimestamp, updateDoc, type Unsubscribe } from 'firebase/firestore'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Animated,
@@ -87,6 +87,7 @@ export default function SkLiveScreen() {
   } | null>(null)
   const scoreFlashScale = useRef(new Animated.Value(1)).current
   const unsubRef = useRef<(() => void) | null>(null)
+  const unsubSessionRef = useRef<Unsubscribe | null>(null)
   const cricketPanelRef = useRef<CricketPanelRef>(null)
 
   useEffect(() => {
@@ -106,13 +107,18 @@ export default function SkLiveScreen() {
   useEffect(() => {
     if (!sessionId) return
 
-    getDoc(doc(db, 'sessions', sessionId)).then((snap) => {
-      if (snap.exists()) {
-        const data = snap.data()
-        setTeams((data.teams as Team[]) ?? [])
-        setPlayers((data.players as Player[]) ?? [])
-        setSportKey((data.eventType as SportKey) ?? 'soccer')
-        setWhoGoesFirst((data.whoGoesFirst as string) ?? '')
+    // Subscribe to session doc: load static fields + watch for session ending
+    const sessionRef = doc(db, 'sessions', sessionId)
+    unsubSessionRef.current = onSnapshot(sessionRef, (snap) => {
+      if (!snap.exists()) return
+      const data = snap.data()
+      setTeams((data.teams as Team[]) ?? [])
+      setPlayers((data.players as Player[]) ?? [])
+      setSportKey((data.eventType as SportKey) ?? 'soccer')
+      setWhoGoesFirst((data.whoGoesFirst as string) ?? '')
+      // Navigate to ended screen when Director ends the session
+      if (data.status === 'ended') {
+        router.replace({ pathname: '/(guest)/sk-ended', params: { sessionId } })
       }
     })
 
@@ -130,6 +136,7 @@ export default function SkLiveScreen() {
 
     return () => {
       unsubRef.current?.()
+      unsubSessionRef.current?.()
     }
   }, [sessionId])
 
