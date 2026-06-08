@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native'
 import { AttributionSheet } from '../../components/AttributionSheet'
-import { CricketPanel } from '../../components/CricketPanel'
+import { CricketPanel, type CricketPanelRef } from '../../components/CricketPanel'
 import { EventButtons } from '../../components/EventButtons'
 import { OnboardingOverlay, shouldShowOnboarding } from '../../components/OnboardingOverlay'
 import { WicketSheet } from '../../components/WicketSheet'
@@ -87,6 +87,7 @@ export default function SkLiveScreen() {
   } | null>(null)
   const scoreFlashScale = useRef(new Animated.Value(1)).current
   const unsubRef = useRef<(() => void) | null>(null)
+  const cricketPanelRef = useRef<CricketPanelRef>(null)
 
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
@@ -252,6 +253,7 @@ export default function SkLiveScreen() {
       <View style={styles.panels}>
         {sportKey === 'cricket' && sessionId ? (
           <CricketPanel
+            ref={cricketPanelRef}
             sessionId={sessionId}
             teams={teams}
             players={players}
@@ -329,7 +331,11 @@ export default function SkLiveScreen() {
             players.find((p) => p.id === cricketState.nonStrikerPlayerId)?.name ?? 'Non-striker'
           }
           players={players}
-          onDismiss={() => setPendingWicketEventId(null)}
+          onDismiss={() => {
+            setPendingWicketEventId(null)
+            // Count wicket as a legal delivery after WicketSheet closes
+            cricketPanelRef.current?.countLegalDelivery()
+          }}
         />
       ) : null}
 

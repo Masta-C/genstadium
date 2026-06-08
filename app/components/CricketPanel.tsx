@@ -4,14 +4,28 @@
  * Replaces the left/right split in sk-live when sport=cricket.
  * Shows batting/bowling teams, on-strike toggle, over counter, current bowler,
  * and the cricket EventButtons. End Innings swaps batting/bowling teams.
+ *
+ * Over tracking: every legal delivery (not Wide or No Ball) increments the ball counter.
+ * At 6 legal balls, the Over Complete modal fires and Score Keeper picks the next bowler.
+ * Wickets are counted via countLegalDelivery() called by sk-live after WicketSheet closes,
+ * so the Over Complete modal never overlaps with the WicketSheet.
  */
 
 import type { SportEvent } from '@genstadium/event-config'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import {
   Alert,
   Animated,
+  Modal,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -58,6 +72,11 @@ interface CricketPanelProps {
   onCricketStateChange?: (state: CricketState) => void
 }
 
+export interface CricketPanelRef {
+  /** Count one legal delivery. Call from sk-live when WicketSheet closes. */
+  countLegalDelivery: () => void
+}
+
 const DEFAULT_CRICKET_STATE = (battingTeamId: string, bowlingTeamId: string): CricketState => ({
   battingTeamId,
   bowlingTeamId,
@@ -68,25 +87,37 @@ const DEFAULT_CRICKET_STATE = (battingTeamId: string, bowlingTeamId: string): Cr
   nonStrikerPlayerId: '',
 })
 
-export function CricketPanel({
-  sessionId,
-  teams,
-  players,
-  whoGoesFirst,
-  onEventTap,
-  onScoringTap,
-  scoreFlashScale,
-  homeScore,
-  awayScore,
-  onCricketStateChange,
-}: CricketPanelProps) {
+export const CricketPanel = forwardRef<CricketPanelRef, CricketPanelProps>(function CricketPanel(
+  {
+    sessionId,
+    teams,
+    players,
+    whoGoesFirst,
+    onEventTap,
+    onScoringTap,
+    scoreFlashScale,
+    homeScore,
+    awayScore,
+    onCricketStateChange,
+  },
+  ref,
+) {
   const battingTeamIdDefault = whoGoesFirst || teams[0]?.id || 'team-a'
   const bowlingTeamIdDefault = teams.find((t) => t.id !== battingTeamIdDefault)?.id || 'team-b'
 
   const [cricketState, setCricketState] = useState<CricketState>(
     DEFAULT_CRICKET_STATE(battingTeamIdDefault, bowlingTeamIdDefault),
   )
+  const [showOverModal, setShowOverModal] = useState(false)
+  const [completedOverNumber, setCompletedOverNumber] = useState(0)
+
+  // Keep a ref to avoid stale closure in countLegalDelivery
+  const cricketStateRef = useRef<CricketState>(cricketState)
   const unsubRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    cricketStateRef.current = cricketState
+  }, [cricketState])
 
   // Subscribe to cricketState from Firestore
   useEffect(() => {
@@ -101,7 +132,6 @@ export function CricketPanel({
           setCricketState(cs)
           onCricketStateChange?.(cs)
         } else {
-          // initialise on first load
           const initial = DEFAULT_CRICKET_STATE(battingTeamIdDefault, bowlingTeamIdDefault)
           updateDoc(ref, { cricketState: initial }).catch(() => {/* silent */})
           setCricketState(initial)
@@ -116,20 +146,43 @@ export function CricketPanel({
 
   const battingTeam = teams.find((t) => t.id === cricketState.battingTeamId) ?? teams[0]
   const bowlingTeam = teams.find((t) => t.id === cricketState.bowlingTeamId) ?? teams[1]
-
+  const bowlingPlayers = players.filter((p) => p.teamId === cricketState.bowlingTeamId)
   const battingPlayers = players.filter((p) => p.teamId === cricketState.battingTeamId)
   const striker = battingPlayers.find((p) => p.id === cricketState.strikerPlayerId) ?? battingPlayers[0]
 
   const overLabel = `${cricketState.oversBowled}.${cricketState.ballsInCurrentOver} ov`
 
-  // Team A score = homeScore, Team B score = awayScore
   const battingScore = battingTeam?.id === teams[0]?.id ? homeScore : awayScore
   const bowlingScore = bowlingTeam?.id === teams[0]?.id ? homeScore : awayScore
 
-  function handleStrikeSwitch(newStrikerId: string, newNonStrikerId: string) {
-    const updated = { ...cricketState, strikerPlayerId: newStrikerId, nonStrikerPlayerId: newNonStrikerId }
+  function applyStateUpdate(updated: CricketState) {
     setCricketState(updated)
+    onCricketStateChange?.(updated)
     updateDoc(doc(db, 'sessions', sessionId), { cricketState: updated }).catch(() => {/* silent */})
+  }
+
+  /** Increment ball counter. At 6 balls: reset counter, bump over count, show modal. */
+  const countLegalDelivery = useCallback(() => {
+    const cs = cricketStateRef.current
+    const newBalls = cs.ballsInCurrentOver + 1
+
+    if (newBalls >= 6) {
+      const newOvers = cs.oversBowled + 1
+      const updated: CricketState = { ...cs, ballsInCurrentOver: 0, oversBowled: newOvers }
+      applyStateUpdate(updated)
+      setCompletedOverNumber(newOvers)
+      setShowOverModal(true)
+    } else {
+      const updated: CricketState = { ...cs, ballsInCurrentOver: newBalls }
+      applyStateUpdate(updated)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId])
+
+  useImperativeHandle(ref, () => ({ countLegalDelivery }), [countLegalDelivery])
+
+  function handleStrikeSwitch(newStrikerId: string, newNonStrikerId: string) {
+    applyStateUpdate({ ...cricketState, strikerPlayerId: newStrikerId, nonStrikerPlayerId: newNonStrikerId })
   }
 
   function handleEndInnings() {
@@ -142,7 +195,7 @@ export function CricketPanel({
           text: 'End Innings',
           style: 'destructive',
           onPress: () => {
-            const updated: CricketState = {
+            applyStateUpdate({
               battingTeamId: cricketState.bowlingTeamId,
               bowlingTeamId: cricketState.battingTeamId,
               oversBowled: 0,
@@ -150,18 +203,18 @@ export function CricketPanel({
               currentBowler: '',
               strikerPlayerId: '',
               nonStrikerPlayerId: '',
-            }
-            setCricketState(updated)
-            updateDoc(doc(db, 'sessions', sessionId), {
-              cricketState: updated,
-            }).catch(() => {/* silent */})
+            })
           },
         },
       ],
     )
   }
 
-  // Intercept END_INN → confirm dialog. Wicket is handled by sk-live (WicketSheet).
+  function handleBowlerSelect(name: string) {
+    applyStateUpdate({ ...cricketStateRef.current, currentBowler: name })
+    setShowOverModal(false)
+  }
+
   const handleEventTapWrapped = useCallback(
     (event: SportEvent, teamId: string) => {
       if (event.id === 'end_innings') {
@@ -169,16 +222,20 @@ export function CricketPanel({
         return
       }
       onEventTap(event, teamId)
+      // Wide and No Ball are extras — do not count as legal deliveries
+      // Wickets are counted by sk-live via countLegalDelivery() after WicketSheet closes
+      if (!event.isExtra && event.id !== 'wicket') {
+        countLegalDelivery()
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onEventTap, cricketState],
+    [onEventTap, cricketState, countLegalDelivery],
   )
 
   return (
     <View style={styles.container}>
       {/* Innings header */}
       <View style={styles.inningsHeader}>
-        {/* Batting team (highlighted) */}
         <View style={[styles.teamScore, styles.battingTeam]}>
           <View style={[styles.colourDot, { backgroundColor: battingTeam?.colour ?? '#1DB954' }]} />
           <Text style={[styles.teamName, { color: battingTeam?.colour ?? '#1DB954' }]} numberOfLines={1}>
@@ -190,7 +247,6 @@ export function CricketPanel({
           <Text style={styles.battingLabel}>BAT</Text>
         </View>
 
-        {/* Over badge */}
         <View style={styles.overBadge}>
           <Text style={styles.overLabel}>{overLabel}</Text>
           {cricketState.currentBowler ? (
@@ -200,7 +256,6 @@ export function CricketPanel({
           ) : null}
         </View>
 
-        {/* Bowling team (muted) */}
         <View style={styles.teamScore}>
           <View style={[styles.colourDot, { backgroundColor: bowlingTeam?.colour ?? '#2D86FF' }]} />
           <Text style={[styles.teamName, { color: '#535353' }]} numberOfLines={1}>
@@ -253,9 +308,58 @@ export function CricketPanel({
           onScoringTap={onScoringTap}
         />
       </View>
+
+      {/* Over Complete modal — fires when 6th legal ball is bowled */}
+      <Modal
+        visible={showOverModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowOverModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>✅ Over {completedOverNumber} complete</Text>
+            <Text style={styles.modalSubtitle}>Who bowls next?</Text>
+
+            <ScrollView style={styles.bowlerList} showsVerticalScrollIndicator={false}>
+              {bowlingPlayers.length === 0 ? (
+                <TouchableOpacity
+                  style={styles.bowlerButton}
+                  onPress={() => handleBowlerSelect('Unknown')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.bowlerName}>Unknown bowler</Text>
+                </TouchableOpacity>
+              ) : (
+                bowlingPlayers.map((p) => (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={styles.bowlerButton}
+                    onPress={() => handleBowlerSelect(p.name)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.jerseyBadge}>
+                      <Text style={styles.jerseyText}>{p.jerseyNumber}</Text>
+                    </View>
+                    <Text style={styles.bowlerName}>{p.name}</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.skipBowlerButton}
+              onPress={() => setShowOverModal(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.skipBowlerText}>Skip — set bowler later</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
-}
+})
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 12 },
@@ -360,4 +464,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   buttons: { flex: 1 },
+  // Over Complete modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#1E1E1E',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    maxHeight: '70%',
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    color: '#B3B3B3',
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  bowlerList: {
+    maxHeight: 240,
+    marginBottom: 12,
+  },
+  bowlerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2A2A2A',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 8,
+    gap: 12,
+  },
+  jerseyBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 6,
+    backgroundColor: '#1A1A1A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jerseyText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  bowlerName: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  skipBowlerButton: { alignItems: 'center', paddingVertical: 12 },
+  skipBowlerText: { color: '#535353', fontSize: 13, textDecorationLine: 'underline' },
 })
