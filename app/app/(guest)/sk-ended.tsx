@@ -31,6 +31,13 @@ interface Team {
   colour: string
 }
 
+interface Player {
+  id: string
+  teamId: string
+  jerseyNumber: string
+  name: string
+}
+
 interface ScoreState {
   homeScore: number
   awayScore: number
@@ -54,6 +61,7 @@ export default function SkEndedScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>()
 
   const [teams, setTeams] = useState<Team[]>([])
+  const [players, setPlayers] = useState<Player[]>([])
   const [sportKey, setSportKey] = useState<SportKey>('soccer')
   const [scoreState, setScoreState] = useState<ScoreState>({ homeScore: 0, awayScore: 0, period: '' })
   const [events, setEvents] = useState<MatchEvent[]>([])
@@ -70,6 +78,7 @@ export default function SkEndedScreen() {
       if (snap.exists()) {
         const data = snap.data()
         setTeams((data.teams as Team[]) ?? [])
+        setPlayers((data.players as Player[]) ?? [])
         setSportKey((data.eventType as SportKey) ?? 'soccer')
         const sat = data.startedAt as { seconds: number } | null | undefined
         if (sat?.seconds) setStartedAtSeconds(sat.seconds)
@@ -203,6 +212,7 @@ export default function SkEndedScreen() {
             sportKey={sportKey}
             tab={tabs[activeTab] ?? ''}
             teams={teams}
+            players={players}
             events={events}
             startedAtSeconds={startedAtSeconds}
           />
