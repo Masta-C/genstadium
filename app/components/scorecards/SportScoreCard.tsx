@@ -2,17 +2,18 @@
  * SportScoreCard — dispatches to the correct sport-specific scorecard component.
  *
  * Each sport's component is wired in sequentially:
- *   #40 Soccer  → SoccerScoreCard  ✅
- *   #41 Cricket → CricketScoreCard (pending)
+ *   #40 Soccer     → SoccerScoreCard   ✅
+ *   #41 Cricket    → CricketScoreCard  ✅
  *   #42 Basketball → BasketballScoreCard (pending)
  *   #43 American Football → AmFootballScoreCard (pending)
  *   #44 Pickleball → PickleballScoreCard (pending)
- *   #45 Badminton → BadmintonScoreCard (pending)
+ *   #45 Badminton  → BadmintonScoreCard (pending)
  */
 
 import type { SportKey } from '@genstadium/event-config'
 import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
+import { CricketScoreCard } from './CricketScoreCard'
 import { type MatchEvent, SoccerScoreCard } from './SoccerScoreCard'
 
 export type { MatchEvent }
@@ -23,15 +24,23 @@ interface Team {
   colour: string
 }
 
+interface Player {
+  id: string
+  teamId: string
+  jerseyNumber: string
+  name: string
+}
+
 interface SportScoreCardProps {
   sportKey: SportKey
   tab: string
   teams: Team[]
+  players: Player[]
   events: MatchEvent[]
   startedAtSeconds: number | null
 }
 
-export function SportScoreCard({ sportKey, tab, teams, events, startedAtSeconds }: SportScoreCardProps) {
+export function SportScoreCard({ sportKey, tab, teams, players, events, startedAtSeconds }: SportScoreCardProps) {
   if (sportKey === 'soccer') {
     return (
       <SoccerScoreCard
@@ -43,7 +52,18 @@ export function SportScoreCard({ sportKey, tab, teams, events, startedAtSeconds 
     )
   }
 
-  // Remaining sports wired in issues #41–#45
+  if (sportKey === 'cricket') {
+    return (
+      <CricketScoreCard
+        tab={tab}
+        teams={teams}
+        players={players}
+        events={events}
+      />
+    )
+  }
+
+  // Remaining sports wired in issues #42–#45
   return (
     <View style={styles.pending}>
       <Text style={styles.pendingText}>
