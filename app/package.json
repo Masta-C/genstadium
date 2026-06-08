@@ -14,6 +14,7 @@
   "dependencies": {
     "@genstadium/event-config": "*",
     "@livekit/react-native": "^2.11.0",
+    "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native-google-signin/google-signin": "^13.0.0",
     "@react-navigation/native": "^7.0.0",
     "expo": "~52.0.0",
