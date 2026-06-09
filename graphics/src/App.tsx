@@ -14,19 +14,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import LowerThird from './components/LowerThird'
 import Scorebug from './components/Scorebug'
 import { db } from './lib/firebase'
-
-function useLayoutParams(): {
-  sessionId: string | null
-  lkToken: string | null
-  lkUrl: string | null
-} {
-  const params = new URLSearchParams(window.location.search)
-  return {
-    sessionId: params.get('layout'),
-    lkToken: params.get('lk_token'),
-    lkUrl: params.get('lk_url'),
-  }
-}
+import { useLayoutParams } from './hooks/useLayoutParams'
 
 function useDirectorState(sessionId: string | null): {
   activeSource: string | null
