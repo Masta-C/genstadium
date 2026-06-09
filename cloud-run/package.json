@@ -10,7 +10,9 @@
     "typecheck:rules": "tsc --noEmit -p tsconfig.rules.json",
     "lint": "eslint src --ext .ts --max-warnings 0",
     "test": "jest",
-    "test:rules": "jest --config jest.rules.config.js"
+    "test:rules": "jest --config jest.rules.config.js",
+    "test:integration": "jest --config jest.integration.config.js",
+    "typecheck:integration": "tsc --noEmit -p tsconfig.integration.json"
   },
   "dependencies": {
     "@genstadium/event-config": "*",
