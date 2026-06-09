@@ -7,11 +7,13 @@
  *
  * Positioned by the parent (App.tsx) at bottom-right.
  * Score numbers use tabular-nums to prevent layout shift on update.
+ * Score change triggers scale spring animation (issue #49).
  */
 
 import { doc, onSnapshot } from 'firebase/firestore'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { db } from '../lib/firebase'
+import styles from './Scorebug.module.css'
 
 interface Team {
   name: string
@@ -35,6 +37,12 @@ export default function Scorebug({ sessionId }: Props) {
     awayScore: 0,
     period: '',
   })
+  // Track which scores are animating; key = home|away, value = animation counter
+  const [homeFlash, setHomeFlash] = useState(0)
+  const [awayFlash, setAwayFlash] = useState(0)
+  // Refs hold previous scores to detect changes without triggering re-renders
+  const prevHome = useRef<number | null>(null)
+  const prevAway = useRef<number | null>(null)
 
   useEffect(() => {
     const sessionUnsub = onSnapshot(doc(db, 'sessions', sessionId), (snap) => {
@@ -50,11 +58,21 @@ export default function Scorebug({ sessionId }: Props) {
       (snap) => {
         if (!snap.exists()) return
         const data = snap.data()
-        setScoreState({
+        const next: ScoreState = {
           homeScore: data.homeScore ?? 0,
           awayScore: data.awayScore ?? 0,
           period: data.period ?? '',
-        })
+        }
+        // Detect change only after initial render (prevHome/Away initialised)
+        if (prevHome.current !== null && next.homeScore !== prevHome.current) {
+          setHomeFlash((n) => n + 1)
+        }
+        if (prevAway.current !== null && next.awayScore !== prevAway.current) {
+          setAwayFlash((n) => n + 1)
+        }
+        prevHome.current = next.homeScore
+        prevAway.current = next.awayScore
+        setScoreState(next)
       },
     )
 
@@ -106,7 +124,7 @@ export default function Scorebug({ sessionId }: Props) {
           alignItems: 'stretch',
         }}
       >
-        <TeamScore team={homeTeam} score={scoreState.homeScore} align="left" />
+        <TeamScore team={homeTeam} score={scoreState.homeScore} align="left" flashKey={homeFlash} />
         <div
           style={{
             width: 1,
@@ -114,7 +132,7 @@ export default function Scorebug({ sessionId }: Props) {
             flexShrink: 0,
           }}
         />
-        <TeamScore team={awayTeam} score={scoreState.awayScore} align="right" />
+        <TeamScore team={awayTeam} score={scoreState.awayScore} align="right" flashKey={awayFlash} />
       </div>
     </div>
   )
@@ -124,10 +142,13 @@ interface TeamScoreProps {
   team: Team
   score: number
   align: 'left' | 'right'
+  flashKey: number
 }
 
-function TeamScore({ team, score, align }: TeamScoreProps) {
+function TeamScore({ team, score, align, flashKey }: TeamScoreProps) {
   const isLeft = align === 'left'
+  // Re-mount span by changing key to replay the CSS animation on each score change
+  const animKey = flashKey > 0 ? flashKey : undefined
   return (
     <div
       style={{
@@ -165,8 +186,10 @@ function TeamScore({ team, score, align }: TeamScoreProps) {
       >
         {team.name}
       </span>
-      {/* Score */}
+      {/* Score — re-keyed to replay animation; transform-only to avoid reflow */}
       <span
+        key={animKey}
+        className={flashKey > 0 ? styles.scoreFlash : undefined}
         style={{
           color: '#FFFFFF',
           fontSize: 22,
@@ -176,6 +199,7 @@ function TeamScore({ team, score, align }: TeamScoreProps) {
           flexShrink: 0,
           minWidth: 28,
           textAlign: 'center',
+          display: 'inline-block',
         }}
       >
         {score}
