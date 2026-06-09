@@ -5,6 +5,9 @@
  * Sums scoreDelta per team across all non-deleted events and writes
  * sessions/{sessionId}/scoreState/current. This is the ONLY writer of scoreState —
  * clients are read-only (enforced by Firestore rules).
+ *
+ * replayPrefetchTrigger — triggered on events/{eventId} onCreate.
+ * Fires POST /replay/prefetch on Cloud Run when triggers includes 'prefetch' (ADR-006).
  */
 
 import * as admin from 'firebase-admin'
@@ -13,6 +16,8 @@ import { FieldValue } from 'firebase-admin/firestore'
 
 admin.initializeApp()
 const db = admin.firestore()
+
+const CLOUD_RUN_URL = process.env.CLOUD_RUN_URL ?? 'http://localhost:8081'
 
 interface ScoreEvent {
   eventType: string
@@ -83,5 +88,53 @@ export const scoreStateAggregator = onDocumentCreated(
       lastEvent: lastEvent ?? FieldValue.delete(),
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true })
+  },
+)
+
+interface ScoreEventForPrefetch {
+  triggers?: string[]
+  timestamp?: admin.firestore.Timestamp
+}
+
+/**
+ * Core pre-fetch logic — extracted for unit testing.
+ * Calls Cloud Run /replay/prefetch when the event has triggers:['prefetch'].
+ * Fire-and-forget: any network error is logged but does not throw.
+ */
+export async function handlePrefetchTrigger(
+  sessionId: string,
+  eventData: ScoreEventForPrefetch,
+  cloudRunUrl: string = CLOUD_RUN_URL,
+): Promise<void> {
+  if (!eventData.triggers?.includes('prefetch')) return
+
+  const eventTimestamp = eventData.timestamp?.toMillis() ?? Date.now()
+
+  // Read replayCameraSlot from the session (ISO Camera identity per ADR-007)
+  const sessionSnap = await db.doc(`sessions/${sessionId}`).get()
+  const cameraId = (sessionSnap.data()?.replayCameraSlot as string | undefined) ?? 'cam_1'
+
+  try {
+    await fetch(`${cloudRunUrl}/replay/prefetch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, cameraId, eventTimestamp }),
+    })
+  } catch (err) {
+    // Fire-and-forget: log and continue — replay unavailability must not block scoring
+    console.error('replayPrefetchTrigger: Cloud Run call failed', err)
+  }
+}
+
+/**
+ * Triggered on every new score event.
+ * If the event has triggers:['prefetch'], kicks off replay clip pre-encoding on Cloud Run (ADR-006).
+ */
+export const replayPrefetchTrigger = onDocumentCreated(
+  'sessions/{sessionId}/events/{eventId}',
+  async (event) => {
+    const { sessionId } = event.params
+    const eventData = (event.data?.data() ?? {}) as ScoreEventForPrefetch
+    await handlePrefetchTrigger(sessionId, eventData)
   },
 )
