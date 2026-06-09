@@ -11,6 +11,7 @@
 import express, { NextFunction, Request, Response } from 'express'
 import { initAdminApp } from './lib/firebase'
 import { registerJoinRoute } from './session/join'
+import { registerEndRoute } from './session/end'
 import { registerPrefetchRoute } from './replay/prefetch'
 import { registerInjectRoute } from './replay/inject'
 import { registerLiveKitWebhook } from './webhooks/livekit'
@@ -38,6 +39,7 @@ app.get('/health', (_req: Request, res: Response) => {
 // API routes
 // ---------------------------------------------------------------------------
 registerJoinRoute(app)
+registerEndRoute(app)
 registerPrefetchRoute(app)
 registerInjectRoute(app)
 

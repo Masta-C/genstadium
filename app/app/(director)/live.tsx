@@ -8,21 +8,20 @@
  * Replay banner: subscribes to session.latestReplayClip. Single 🎬 badge; most
  * recent clip overwrites. Tap → POST /replay/inject. Banner hidden when ISO Camera
  * is offline or when a replay is already playing (activeSource starts with "replay-clip-").
- *
- * End Session is wired in issue #80.
  */
 
 import { router, useLocalSearchParams } from 'expo-router'
 import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import React, { useEffect, useRef, useState } from 'react'
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
-import { db } from '../../lib/firebase/client'
+import { auth, db } from '../../lib/firebase/client'
 
 const CLOUD_RUN_URL =
   (process.env.EXPO_PUBLIC_CLOUD_RUN_URL ?? 'http://localhost:8081').replace(/\/$/, '')
@@ -233,6 +232,46 @@ export default function DirectorLiveScreen() {
     }
   }
 
+  // ── End Session ──────────────────────────────────────────────────────────
+  function promptEndSession() {
+    Alert.alert(
+      'End Session',
+      'Stop the stream and end the session for all participants?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'End Session', style: 'destructive', onPress: endSession },
+      ],
+    )
+  }
+
+  async function endSession() {
+    if (!sessionId) return
+    try {
+      const idToken = await auth.currentUser?.getIdToken()
+      if (!idToken) return
+      const res = await fetch(`${CLOUD_RUN_URL}/session/end`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ sessionId }),
+      })
+      if (!res.ok) {
+        const data = (await res.json()) as { message?: string }
+        Alert.alert('Error', data.message ?? 'Failed to end session')
+        return
+      }
+      // Navigate to summary — onSnapshot will also catch status=ended
+      router.replace({
+        pathname: '/(director)/summary' as never,
+        params: { sessionId },
+      })
+    } catch {
+      Alert.alert('Error', 'Could not reach server. Please try again.')
+    }
+  }
+
   // ── Derived state ──────────────────────────────────────────────────────────
   const slots = session?.cameraSlots ?? []
   // Optimistic local override takes precedence; Firestore value as fallback
@@ -398,12 +437,9 @@ export default function DirectorLiveScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* End Session — wired in #80 */}
         <TouchableOpacity
           style={styles.endButton}
-          onPress={() =>
-            router.push({ pathname: '/(director)/live', params: { sessionId } })
-          }
+          onPress={promptEndSession}
           activeOpacity={0.8}
         >
           <Text style={styles.endButtonText}>■ End</Text>
