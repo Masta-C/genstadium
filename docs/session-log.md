@@ -41,3 +41,4 @@
 2026-06-09 | #69 go-live-sequence | PR https://github.com/Masta-C/genstadium/pull/165 | NOTE: listParticipants gets ISO Camera track SID; falls back to room composite if SID unavailable
 2026-06-09 | #73 egress-b-track-egress | PR https://github.com/Masta-C/genstadium/pull/166 | NOTE: egressIds.b field path (not egressBId); participant_left checks identity===replayCameraSlot; stopEgress failure is non-fatal
 2026-06-09 | #88 credit-balance-display | PR https://github.com/Masta-C/genstadium/pull/167 | NOTE: balance at users/{uid}/credits/balance doc; null while loading prevents flash of 0
+2026-06-09 | #91 animation-trigger | PR https://github.com/Masta-C/genstadium/pull/168 | NOTE: replay-clip- prefix used for anim Ingress identity so existing webhook handles auto-return; unmapped eventTypes silently skipped
