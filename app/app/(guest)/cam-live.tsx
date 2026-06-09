@@ -1,19 +1,22 @@
 import '../../lib/livekit'
-import { useLocalSearchParams } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import {
   LiveKitRoom,
   VideoView,
   useConnectionState,
   useLocalParticipant,
+  useRoomContext,
 } from '@livekit/react-native'
 import { ConnectionQuality, ConnectionState } from 'livekit-client'
-import React, { useEffect, useState } from 'react'
+import { doc, onSnapshot } from 'firebase/firestore'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import { db } from '../../lib/firebase/client'
 import { useSessionStore } from '../../store/sessionStore'
 
 const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL ?? 'wss://localhost:7880'
@@ -21,10 +24,36 @@ const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL ?? 'wss://localhost:7880
 // ---------------------------------------------------------------------------
 // Inner screen — rendered inside LiveKitRoom context
 // ---------------------------------------------------------------------------
-function CamLiveInner({ slotName }: { slotName: string }) {
+function CamLiveInner({ slotName, sessionId, sessionName }: {
+  slotName: string
+  sessionId: string | null
+  sessionName: string | null
+}) {
   const { localParticipant, isCameraEnabled, cameraTrack } = useLocalParticipant()
   const connectionState = useConnectionState()
+  const room = useRoomContext()
   const [facingFront, setFacingFront] = useState(true)
+  const navigatedRef = useRef(false)
+
+  // Watch session status — leave Room and navigate when Director ends session
+  useEffect(() => {
+    if (!sessionId) return
+
+    const unsubscribe = onSnapshot(doc(db, 'sessions', sessionId), (snap) => {
+      if (!snap.exists() || navigatedRef.current) return
+      if (snap.data().status === 'ended') {
+        navigatedRef.current = true
+        localParticipant.setCameraEnabled(false).catch(() => {})
+        room.disconnect().catch(() => {})
+        router.replace({
+          pathname: '/(guest)/cam-ended',
+          params: { sessionId, sessionName: sessionName ?? '' },
+        })
+      }
+    })
+
+    return unsubscribe
+  }, [sessionId, sessionName, localParticipant, room])
 
   // Publish camera immediately on connect
   useEffect(() => {
@@ -111,8 +140,11 @@ function CamLiveInner({ slotName }: { slotName: string }) {
 // Root screen — provides LiveKitRoom context
 // ---------------------------------------------------------------------------
 export default function CamLiveScreen() {
-  const { slotName } = useLocalSearchParams<{ slotName: string }>()
-  const { liveKitToken } = useSessionStore()
+  const { slotName, sessionName } = useLocalSearchParams<{
+    slotName: string
+    sessionName: string
+  }>()
+  const { liveKitToken, sessionId } = useSessionStore()
 
   const displaySlotName = slotName ?? 'Camera'
 
@@ -133,7 +165,11 @@ export default function CamLiveScreen() {
       video={false}
       options={{ adaptiveStream: true, dynacast: true }}
     >
-      <CamLiveInner slotName={displaySlotName} />
+      <CamLiveInner
+        slotName={displaySlotName}
+        sessionId={sessionId}
+        sessionName={sessionName ?? null}
+      />
     </LiveKitRoom>
   )
 }
