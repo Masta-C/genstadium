@@ -5,7 +5,10 @@
  * status (no video previews — ADR-005). LIVE badge + stream timer. Score display.
  * Score Keeper status + event count in bottom bar.
  *
- * Replay banner is wired in issue #78.
+ * Replay banner: subscribes to session.latestReplayClip. Single 🎬 badge; most
+ * recent clip overwrites. Tap → POST /replay/inject. Banner hidden when ISO Camera
+ * is offline or when a replay is already playing (activeSource starts with "replay-clip-").
+ *
  * End Session is wired in issue #80.
  */
 
@@ -20,6 +23,9 @@ import {
   View,
 } from 'react-native'
 import { db } from '../../lib/firebase/client'
+
+const CLOUD_RUN_URL =
+  (process.env.EXPO_PUBLIC_CLOUD_RUN_URL ?? 'http://localhost:8081').replace(/\/$/, '')
 
 interface CameraSlot {
   id: string
@@ -51,12 +57,20 @@ interface DirectorState {
   scorebugVisible: boolean
 }
 
+interface LatestReplayClip {
+  gcsPath: string
+  clipId: string
+  readyAt: { seconds: number }
+}
+
 interface SessionData {
   sessionName: string
   cameraSlots: CameraSlot[]
   teams: Team[]
   startedAt: { seconds: number } | null
   directorState: DirectorState
+  latestReplayClip: LatestReplayClip | null
+  replayCameraOnline: boolean
 }
 
 export default function DirectorLiveScreen() {
@@ -70,9 +84,12 @@ export default function DirectorLiveScreen() {
   })
   const [eventCount, setEventCount] = useState(0)
   const [elapsed, setElapsed] = useState(0)
+  // Seconds elapsed since latestReplayClip.readyAt — drives "12s ago" label on banner
+  const [bannerElapsed, setBannerElapsed] = useState(0)
   // Optimistic local override for activeSource — cleared when Firestore confirms
   const [optimisticSource, setOptimisticSource] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const bannerTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     if (!sessionId) return
@@ -81,6 +98,7 @@ export default function DirectorLiveScreen() {
       if (!snap.exists()) return
       const data = snap.data()
       const firestoreSource = (data.directorState?.activeSource as string | null) ?? null
+      const rawClip = data.latestReplayClip as LatestReplayClip | null | undefined
       setSession({
         sessionName: (data.sessionName as string) ?? '',
         cameraSlots: (data.cameraSlots as CameraSlot[]) ?? [],
@@ -90,6 +108,8 @@ export default function DirectorLiveScreen() {
           activeSource: firestoreSource,
           scorebugVisible: Boolean(data.directorState?.scorebugVisible),
         },
+        latestReplayClip: rawClip ?? null,
+        replayCameraOnline: data.replayCameraOnline !== false, // default true if absent
       })
       // Clear optimistic override once Firestore has confirmed the write
       setOptimisticSource((prev) => (prev === firestoreSource ? null : prev))
@@ -154,6 +174,25 @@ export default function DirectorLiveScreen() {
     }
   }, [session?.startedAt])
 
+  // Banner "X seconds ago" timer — ticks only while a clip is ready
+  useEffect(() => {
+    const readyAt = session?.latestReplayClip?.readyAt?.seconds
+    if (!readyAt) {
+      setBannerElapsed(0)
+      if (bannerTimerRef.current) clearInterval(bannerTimerRef.current)
+      return
+    }
+    const readyAtSec = readyAt
+    function tick() {
+      setBannerElapsed(Math.floor(Date.now() / 1000) - readyAtSec)
+    }
+    tick()
+    bannerTimerRef.current = setInterval(tick, 1000)
+    return () => {
+      if (bannerTimerRef.current) clearInterval(bannerTimerRef.current)
+    }
+  }, [session?.latestReplayClip?.readyAt?.seconds])
+
   // ── Scorebug toggle ───────────────────────────────────────────────────────
   async function toggleScorebug() {
     if (!sessionId) return
@@ -178,6 +217,22 @@ export default function DirectorLiveScreen() {
     }
   }
 
+  // ── Replay inject ─────────────────────────────────────────────────────────
+  async function injectReplay() {
+    const clip = session?.latestReplayClip
+    if (!sessionId || !clip) return
+    try {
+      await fetch(`${CLOUD_RUN_URL}/replay/inject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, clipId: clip.clipId }),
+      })
+      // Cloud Run clears latestReplayClip after successful injection
+    } catch {
+      // Silent — next snapshot will resync if Cloud Run confirms
+    }
+  }
+
   // ── Derived state ──────────────────────────────────────────────────────────
   const slots = session?.cameraSlots ?? []
   // Optimistic local override takes precedence; Firestore value as fallback
@@ -190,6 +245,13 @@ export default function DirectorLiveScreen() {
       participantBySlot[p.slotId] = p
     }
   }
+
+  // Replay banner: visible when clip ready, ISO Camera online, and not already replaying
+  const isReplayPlaying = activeSource?.startsWith('replay-clip-') ?? false
+  const showReplayBanner =
+    Boolean(session?.latestReplayClip) &&
+    (session?.replayCameraOnline !== false) &&
+    !isReplayPlaying
 
   const skParticipants = participants.filter((p) => p.role === 'scorekeeper')
   const skReady = skParticipants.some((p) => p.status === 'ready')
@@ -234,6 +296,19 @@ export default function DirectorLiveScreen() {
       </View>
       {scoreState.period ? (
         <Text style={styles.periodLabel}>{scoreState.period}</Text>
+      ) : null}
+
+      {/* ── Replay Ready banner ─────────────────────────────────────────── */}
+      {showReplayBanner ? (
+        <TouchableOpacity
+          style={styles.replayBanner}
+          onPress={injectReplay}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.replayBannerText}>
+            🎬 Replay Ready · {bannerElapsed}s ago
+          </Text>
+        </TouchableOpacity>
       ) : null}
 
       {/* ── Camera grid ─────────────────────────────────────────────────── */}
@@ -440,6 +515,22 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     paddingBottom: 6,
     backgroundColor: '#161616',
+  },
+
+  // Replay Ready banner
+  replayBanner: {
+    backgroundColor: '#2B1E00',
+    borderBottomWidth: 1,
+    borderBottomColor: '#CC8800',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  replayBannerText: {
+    color: '#FFB300',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 
   // Grid
