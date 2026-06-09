@@ -1,14 +1,38 @@
-import React from 'react'
+import { doc, onSnapshot } from 'firebase/firestore'
+import React, { useEffect, useState } from 'react'
 import LowerThird from './components/LowerThird'
 import Scorebug from './components/Scorebug'
+import { db } from './lib/firebase'
 
 function useSessionId(): string | null {
   const params = new URLSearchParams(window.location.search)
   return params.get('layout')
 }
 
+function useDirectorState(sessionId: string | null): {
+  scorebugVisible: boolean
+} {
+  const [scorebugVisible, setScorebugVisible] = useState(true)
+
+  useEffect(() => {
+    if (!sessionId) return
+
+    const unsubscribe = onSnapshot(doc(db, 'sessions', sessionId), (snap) => {
+      if (!snap.exists()) return
+      const data = snap.data()
+      // Default true — scorebug visible unless Director explicitly hides it
+      setScorebugVisible(data.directorState?.scorebugVisible !== false)
+    })
+
+    return unsubscribe
+  }, [sessionId])
+
+  return { scorebugVisible }
+}
+
 export default function App() {
   const sessionId = useSessionId()
+  const { scorebugVisible } = useDirectorState(sessionId)
 
   if (!sessionId) {
     return (
@@ -50,9 +74,11 @@ export default function App() {
         <LowerThird sessionId={sessionId} />
       </div>
       {/* Scorebug — bottom-right, 96px from edges, max-width 320px */}
-      <div style={{ position: 'absolute', bottom: 96, right: 96, maxWidth: 320 }}>
-        <Scorebug sessionId={sessionId} />
-      </div>
+      {scorebugVisible ? (
+        <div style={{ position: 'absolute', bottom: 96, right: 96, maxWidth: 320 }}>
+          <Scorebug sessionId={sessionId} />
+        </div>
+      ) : null}
     </div>
   )
 }
