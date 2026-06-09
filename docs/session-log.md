@@ -32,3 +32,10 @@
 2026-06-09 | #80 end-session | PR https://github.com/Masta-C/genstadium/pull/159 | NOTE: supports both egressAId and egressIds.a field layouts; stop failures are warnings not errors
 2026-06-09 | #90 remotion-compositions | PR https://github.com/Masta-C/genstadium/pull/160 | NOTE: renderMedia mocked in tests; runtime needs CHROMIUM_PATH env + chromium binary in container
 2026-06-09 | BLOCKED | All remaining ready-for-agent issues blocked via #85 (ready-for-human: App Store Connect IAP setup)
+2026-06-09 | #81 director-summary | PR https://github.com/Masta-C/genstadium/pull/161 | NOTE: replayClipCount from replayClips subcollection size; youtubeEnabled from youtubeStreamKey presence; getDocs not onSnapshot (session ended)
+2026-06-09 | #82 sk-session-ended | no PR needed | NOTE: already implemented in PR #128 (feat #39); onSnapshot nav at sk-live.tsx:120-122
+2026-06-09 | #83 cam-session-ended | no PR needed | NOTE: already implemented in cam-live.tsx:39-56; setCameraEnabled+disconnect with .catch guards
+2026-06-09 | #86 stripe-webhook | PR https://github.com/Masta-C/genstadium/pull/162 | NOTE: env var read inside handler (not module level) to allow test mocking; idempotency via subcollection doc
+2026-06-09 | #87 storekit-iap | PR https://github.com/Masta-C/genstadium/pull/163 | NOTE: requestPurchase needs {request:{apple:{sku}},type:'in-app'}; Apple JWS verify stubbed pending #85
+2026-06-09 | #89 credit-check-go-live | PR https://github.com/Masta-C/genstadium/pull/164 | NOTE: Egress B uses startRoomCompositeEgress (not Track Egress — track ID not available at start time); TODO in code for #77
+2026-06-09 | #69 go-live-sequence | PR https://github.com/Masta-C/genstadium/pull/165 | NOTE: listParticipants gets ISO Camera track SID; falls back to room composite if SID unavailable

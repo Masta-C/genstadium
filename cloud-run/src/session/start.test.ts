@@ -255,4 +255,16 @@ describe('POST /session/start', () => {
       expect.objectContaining({ videoTrackId: 'TR_cam1_video' }),
     )
   })
+
+  it('stores Egress B ID at egressIds.b and sets replayCameraOnline true', async () => {
+    const app = buildApp()
+    await request(app)
+      .post('/session/start')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ sessionId: 'sess1' })
+
+    expect(mockDocUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ 'egressIds.b': 'egress-b-id', replayCameraOnline: true }),
+    )
+  })
 })
