@@ -7,13 +7,28 @@
 
 ## Context Management — runs before every iteration
 
-Check context window size at the **start** of each iteration (before Step 0) and **after** filing a PR (after Step 6.5).
+There is **no tool that returns a context percentage**. Use the PR-count heuristics below as the primary signal — they fire before the window fills, not after.
 
-### If context is at yellow (warning):
+### PR-count checkpoints (primary signal — track this across every iteration)
+
+Keep a running count of PRs merged **in the current session** (reset to 0 when a new session starts after a handoff).
+
+| Count | Action |
+|---|---|
+| Every **5th** merged PR | Call `/compact` — compresses conversation noise, stays in same session. Then continue normally. |
+| Every **10th** merged PR | Call `/handoff` → open new tab. Treat as a mandatory session boundary regardless of apparent context state. |
+
+**Example:** merge PR 5 → compact. Merge PR 10 → handoff. Merge PR 15 (new session, count resets) → compact. Etc.
+
+### Colour-based fallback (secondary signal)
+
+Check context window indicator at the **start** of each iteration (before Step 0) and **after** filing a PR (after Step 6.5).
+
+**If context is at yellow (warning):**
 1. Invoke the `compact` slash command (`/compact`) to compress the conversation.
 2. Continue the current iteration normally.
 
-### If context is at orange/red, or if `/compact` fails to bring it back to green:
+**If context is at orange/red, or if `/compact` fails to bring it back to green:**
 1. Invoke the `/handoff` skill to generate a structured handoff document.
    - The handoff MUST include: what was built this session, current git branch and stash state, which issue to pick next, all open PR URLs with CI status, and the rebase pattern note.
    - Save to `mktemp -t handoff-XXXXXX.md` and capture the path.
