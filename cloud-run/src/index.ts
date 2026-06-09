@@ -15,6 +15,7 @@ import { registerStartRoute } from './session/start'
 import { registerEndRoute } from './session/end'
 import { registerPrefetchRoute } from './replay/prefetch'
 import { registerInjectRoute } from './replay/inject'
+import { registerBroadcastRoute } from './replay/broadcast'
 import { registerAnimationRoute } from './animation/render'
 import { registerVerifyReceiptRoute } from './iap/verifyReceipt'
 import { registerLiveKitWebhook } from './webhooks/livekit'
@@ -48,6 +49,7 @@ registerJoinRoute(app)
 registerEndRoute(app)
 registerPrefetchRoute(app)
 registerInjectRoute(app)
+registerBroadcastRoute(app)
 registerAnimationRoute(app)
 registerVerifyReceiptRoute(app)
 
