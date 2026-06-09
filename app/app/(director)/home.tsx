@@ -2,13 +2,13 @@ import { router } from 'expo-router'
 import { signOut as firebaseSignOut } from 'firebase/auth'
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { useCredits } from '../../hooks/useCredits'
 import { auth } from '../../lib/firebase/client'
 import { useAuthStore } from '../../store/authStore'
 
-// Placeholder Director home screen — full implementation in later issues.
-// Provides sign-out functionality to validate the auth guard loop.
 export default function DirectorHomeScreen() {
   const { user, signOut } = useAuthStore()
+  const credits = useCredits()
 
   async function handleSignOut() {
     await firebaseSignOut(auth)
@@ -21,6 +21,10 @@ export default function DirectorHomeScreen() {
       <Text style={styles.heading}>GenStadium</Text>
       <Text style={styles.subheading}>Director Dashboard</Text>
       <Text style={styles.email}>{user?.email}</Text>
+
+      {credits !== null && (
+        <Text style={styles.credits}>{credits} {credits === 1 ? 'event' : 'events'} remaining</Text>
+      )}
 
       <TouchableOpacity style={styles.createButton} onPress={() => router.push('/(director)/create')} activeOpacity={0.8}>
         <Text style={styles.createButtonText}>+ New Session</Text>
@@ -55,7 +59,12 @@ const styles = StyleSheet.create({
   email: {
     color: '#535353',
     fontSize: 14,
-    marginBottom: 40,
+    marginBottom: 12,
+  },
+  credits: {
+    color: '#B3B3B3',
+    fontSize: 14,
+    marginBottom: 28,
   },
   createButton: {
     backgroundColor: '#1DB954',
