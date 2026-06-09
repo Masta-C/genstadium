@@ -101,7 +101,7 @@ jobs:
 
       # ── Firebase Hosting (graphics) + Firestore rules + indexes ─────────────
       - name: Deploy Firebase (Hosting + Firestore rules + indexes)
-        run: npx firebase deploy --only hosting,firestore:rules,firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: npx firebase deploy --only hosting:graphics,firestore:rules,firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }}
 
       # ── Cloud Run ────────────────────────────────────────────────────────────
       - name: Deploy Cloud Run

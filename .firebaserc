@@ -1,5 +1,12 @@
 {
   "projects": {
     "default": "genstadium-2321"
+  },
+  "targets": {
+    "genstadium-2321": {
+      "hosting": {
+        "graphics": ["genstadium-graphics"]
+      }
+    }
   }
 }
