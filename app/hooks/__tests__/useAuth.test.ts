@@ -1,19 +1,17 @@
-import React from 'react'
-import { act, create } from 'react-test-renderer'
+import React, { act } from 'react'
+import { create } from 'react-test-renderer'
 import type { User } from 'firebase/auth'
+import { onAuthStateChanged } from 'firebase/auth'
+import { getDoc } from 'firebase/firestore'
 import { useAuthStore } from '../../store/authStore'
+import { useAuth } from '../useAuth'
 
 // ── Firebase mocks ────────────────────────────────────────────────────────────
 
-// Capture the callback registered by onAuthStateChanged so tests can invoke it.
-let capturedAuthCallback: ((user: User | null) => Promise<void>) | null = null
 const mockUnsubscribe = jest.fn()
 
 jest.mock('firebase/auth', () => ({
-  onAuthStateChanged: jest.fn((_auth: unknown, callback: (user: User | null) => Promise<void>) => {
-    capturedAuthCallback = callback
-    return mockUnsubscribe
-  }),
+  onAuthStateChanged: jest.fn(),
 }))
 
 jest.mock('firebase/firestore', () => ({
@@ -27,16 +25,22 @@ jest.mock('../../lib/firebase/client', () => ({
   db: {},
 }))
 
-// ── Test component ────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-// Minimal wrapper that mounts the hook so useEffect fires.
+type AuthCallback = (user: User | null) => Promise<void>
+let capturedAuthCallback: AuthCallback | null = null
+
+function setupAuthMock() {
+  ;(onAuthStateChanged as jest.Mock).mockImplementation((_auth: unknown, cb: AuthCallback) => {
+    capturedAuthCallback = cb
+    return mockUnsubscribe
+  })
+}
+
 function TestComponent() {
-  const { useAuth } = require('../../hooks/useAuth') as { useAuth: () => void }
   useAuth()
   return null
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function mountHook() {
   let renderer: ReturnType<typeof create>
@@ -57,15 +61,10 @@ async function triggerAuth(user: User | null) {
 beforeEach(() => {
   capturedAuthCallback = null
   jest.clearAllMocks()
+  setupAuthMock()
   act(() => {
     useAuthStore.setState({ user: null, role: null, loading: true })
   })
-})
-
-// ── Store tests (no rendering needed) ────────────────────────────────────────
-
-test('authStore: initial loading is true', () => {
-  expect(useAuthStore.getState().loading).toBe(true)
 })
 
 // ── useAuth hook tests ────────────────────────────────────────────────────────
@@ -81,8 +80,7 @@ test('signed-out: clears user + role and sets loading false', async () => {
 })
 
 test('director (non-anonymous): reads role from Firestore users/{uid}.role', async () => {
-  const { getDoc } = require('firebase/firestore') as { getDoc: jest.Mock }
-  getDoc.mockResolvedValue({ data: () => ({ role: 'director' }) })
+  ;(getDoc as jest.Mock).mockResolvedValue({ data: () => ({ role: 'director' }) })
 
   const directorUser = { uid: 'dir-1', isAnonymous: false } as User
   mountHook()
@@ -95,8 +93,7 @@ test('director (non-anonymous): reads role from Firestore users/{uid}.role', asy
 })
 
 test('director: falls back to "director" role when Firestore throws', async () => {
-  const { getDoc } = require('firebase/firestore') as { getDoc: jest.Mock }
-  getDoc.mockRejectedValue(new Error('permission-denied'))
+  ;(getDoc as jest.Mock).mockRejectedValue(new Error('permission-denied'))
 
   const directorUser = { uid: 'dir-2', isAnonymous: false } as User
   mountHook()
