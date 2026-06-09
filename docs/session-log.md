@@ -45,3 +45,4 @@
 2026-06-09 | #77 replay-broadcast-ingress | PR https://github.com/Masta-C/genstadium/pull/169 | NOTE: reads gcsPath from replayClips/{clipId} doc; object name stripped from gs:// prefix; ingressId written back to clip doc
 2026-06-09 | #94 iso-camera-reconnect | PR https://github.com/Masta-C/genstadium/pull/170 | NOTE: listEgress idempotency check by egressId match; Egress B restart failure non-fatal; lobby joins ignored
 2026-06-09 | #9 eas-config | PR https://github.com/Masta-C/genstadium/pull/171 | NOTE: owner=masta-c (verify); USE_EMULATOR env var replaces __DEV__ guard in firebase client
+2026-06-09 | #68 youtube-oauth | PR https://github.com/Masta-C/genstadium/pull/172 | NOTE: expo-auth-session OAuth; stream key from liveStreams.list cdn.ingestionInfo.streamName; lobby nav updated live-setup→youtube
