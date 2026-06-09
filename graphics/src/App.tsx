@@ -12,20 +12,45 @@ export default function App() {
 
   if (!sessionId) {
     return (
-      <div className="flex h-screen items-center justify-center bg-bg-base text-text-secondary">
-        <p>No session ID. Provide <code>?layout=SESSION_ID</code></p>
+      <div
+        style={{
+          width: 1920,
+          height: 1080,
+          backgroundColor: '#121212',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#535353',
+          fontFamily: "'Inter', sans-serif",
+          fontSize: 16,
+        }}
+      >
+        No session ID. Provide <code style={{ marginLeft: 4 }}>?layout=SESSION_ID</code>
       </div>
     )
   }
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-transparent">
-      {/* Lower third — bottom-left within broadcast safe zone per issue #50 */}
-      <div className="absolute bottom-4 left-24">
+    /*
+     * Broadcast canvas: 1920×1080, dark background.
+     * 96px safe zone on all edges (design tokens: broadcast-safe inset).
+     * Positioned absolutely so elements stay within safe zone at any viewport.
+     */
+    <div
+      style={{
+        position: 'relative',
+        width: 1920,
+        height: 1080,
+        backgroundColor: '#121212',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Lower third — bottom-left, 96px from edges, max-width 640px */}
+      <div style={{ position: 'absolute', bottom: 96, left: 96, maxWidth: 640 }}>
         <LowerThird sessionId={sessionId} />
       </div>
-      {/* Scorebug — bottom-right, max-width 320px per issue #48 */}
-      <div className="absolute bottom-4 right-4">
+      {/* Scorebug — bottom-right, 96px from edges, max-width 320px */}
+      <div style={{ position: 'absolute', bottom: 96, right: 96, maxWidth: 320 }}>
         <Scorebug sessionId={sessionId} />
       </div>
     </div>
