@@ -10,7 +10,7 @@
  */
 
 import express from 'express'
-import { EgressClient, WebhookReceiver } from 'livekit-server-sdk'
+import { EgressClient, GCPUpload, SegmentedFileOutput, SegmentedFileProtocol, WebhookReceiver } from 'livekit-server-sdk'
 import { getDb } from '../lib/firebase'
 import type { Router, Request, Response } from 'express'
 
@@ -35,16 +35,19 @@ async function livekitWebhookHandler(req: Request, res: Response): Promise<void>
     return
   }
 
-  if (event.event === 'participant_left') {
-    const identity = event.participant?.identity ?? ''
-    const roomName = event.room?.name ?? ''
-    if (roomName && identity) {
-      if (identity.startsWith('replay-clip-')) {
-        await handleReplayEnded(roomName)
-      } else {
-        await handleCameraLeft(roomName, identity)
-      }
+  const identity = event.participant?.identity ?? ''
+  const roomName = event.room?.name ?? ''
+
+  if (event.event === 'participant_left' && roomName && identity) {
+    if (identity.startsWith('replay-clip-')) {
+      await handleReplayEnded(roomName)
+    } else {
+      await handleCameraLeft(roomName, identity)
     }
+  }
+
+  if (event.event === 'participant_joined' && roomName && identity) {
+    await handleCameraJoined(roomName, identity)
   }
 
   res.json({ received: true })
@@ -87,6 +90,58 @@ async function handleCameraLeft(sessionId: string, identity: string): Promise<vo
   }
 
   await sessionRef.update({ replayCameraOnline: false })
+}
+
+const DVR_BUCKET = process.env.DVR_BUCKET ?? 'genstadium-dvr'
+const DVR_SEGMENT_SECONDS = 4
+
+/** Restarts Egress B when the ISO Camera reconnects mid-session. */
+async function handleCameraJoined(sessionId: string, identity: string): Promise<void> {
+  const db = getDb()
+  const sessionRef = db.doc(`sessions/${sessionId}`)
+  const snap = await sessionRef.get()
+  if (!snap.exists) return
+
+  const data = snap.data()!
+  const replayCameraSlot = (data.replayCameraSlot as string | undefined) ?? 'cam_1'
+  if (identity !== replayCameraSlot) return
+
+  // Only restart for live sessions — ignore lobby joins
+  if (data.status !== 'live') return
+
+  const egressClient = new EgressClient(LIVEKIT_HOST, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+
+  // Idempotency: skip if Egress B is already active for this session
+  const activeEgresses = await egressClient.listEgress({ roomName: sessionId, active: true })
+  const existingEgressB = (data['egressIds']?.b ?? data.egressBId) as string | undefined
+  if (existingEgressB && activeEgresses.some((e) => e.egressId === existingEgressB)) return
+
+  // Restart Egress B with same path pattern as original start (ADR-007)
+  const segmentedOutput = new SegmentedFileOutput({
+    protocol: SegmentedFileProtocol.HLS_PROTOCOL,
+    filenamePrefix: `dvr/${sessionId}/${replayCameraSlot}/`,
+    segmentDuration: DVR_SEGMENT_SECONDS,
+    output: {
+      case: 'gcp',
+      value: new GCPUpload({ bucket: DVR_BUCKET }),
+    },
+  })
+
+  try {
+    const newEgressB = await egressClient.startTrackCompositeEgress(
+      sessionId,
+      segmentedOutput,
+      { videoTrackId: undefined }, // track SID not yet stable on join — composite covers the slot
+    )
+    await sessionRef.update({
+      'egressIds.b': newEgressB.egressId,
+      replayCameraOnline: true,
+    })
+  } catch (err) {
+    console.warn('[webhooks/livekit] Egress B restart failed:', String(err))
+    // Still mark camera online even if Egress B fails — DVR gap is acceptable
+    await sessionRef.update({ replayCameraOnline: true })
+  }
 }
 
 /**
