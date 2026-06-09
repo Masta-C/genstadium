@@ -14,6 +14,7 @@ import { registerJoinRoute } from './session/join'
 import { registerEndRoute } from './session/end'
 import { registerPrefetchRoute } from './replay/prefetch'
 import { registerInjectRoute } from './replay/inject'
+import { registerAnimationRoute } from './animation/render'
 import { registerLiveKitWebhook } from './webhooks/livekit'
 
 // Initialise Firebase Admin SDK before any route handler uses it
@@ -42,6 +43,7 @@ registerJoinRoute(app)
 registerEndRoute(app)
 registerPrefetchRoute(app)
 registerInjectRoute(app)
+registerAnimationRoute(app)
 
 // ---------------------------------------------------------------------------
 // Global error handler — converts unhandled errors to structured JSON
