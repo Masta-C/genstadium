@@ -128,7 +128,10 @@ export default function GoLiveScreen() {
       })
 
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string }
+        const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
+        if (res.status === 402 || body.error === 'PAYMENT_REQUIRED') {
+          throw new Error('No credits remaining. Visit genstadium.com to continue.')
+        }
         throw new Error(body.message ?? `Server error ${res.status}`)
       }
 
