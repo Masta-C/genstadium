@@ -119,23 +119,35 @@ async function prefetchHandler(req: Request, res: Response): Promise<void> {
     const gcsObjectPath = `${sessionId}/${cameraId}/${eventTimestamp}.mp4`
     await uploadToGcs(outputPath, gcsObjectPath)
 
-    // Write clip metadata to Firestore
+    // Write clip metadata to Firestore + overwrite latestReplayClip on session doc
     const clipId = `${cameraId}-${eventTimestamp}`
+    const fullGcsPath = `gs://${PREFETCH_BUCKET}/${gcsObjectPath}`
     const db = getDb()
-    await db
-      .collection('sessions')
-      .doc(sessionId)
-      .collection('replayClips')
-      .doc(clipId)
-      .set({
-        gcsPath: `gs://${PREFETCH_BUCKET}/${gcsObjectPath}`,
-        ...(eventId ? { eventId } : {}),
-        duration: CLIP_DURATION_SEC,
-        status: 'ready',
-        createdAt: FieldValue.serverTimestamp(),
-      })
 
-    res.json({ clipId, gcsPath: `gs://${PREFETCH_BUCKET}/${gcsObjectPath}` })
+    await Promise.all([
+      db
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('replayClips')
+        .doc(clipId)
+        .set({
+          gcsPath: fullGcsPath,
+          ...(eventId ? { eventId } : {}),
+          duration: CLIP_DURATION_SEC,
+          status: 'ready',
+          createdAt: FieldValue.serverTimestamp(),
+        }),
+      // Overwrite single-field so Director sees only the most recent clip
+      db.doc(`sessions/${sessionId}`).update({
+        latestReplayClip: {
+          gcsPath: fullGcsPath,
+          clipId,
+          readyAt: FieldValue.serverTimestamp(),
+        },
+      }),
+    ])
+
+    res.json({ clipId, gcsPath: fullGcsPath })
   } finally {
     await rm(tmpDir, { recursive: true, force: true })
   }
