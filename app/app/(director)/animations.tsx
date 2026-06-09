@@ -17,13 +17,13 @@ import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import AnimationPreviewModal from '../../components/AnimationPreviewModal'
 import { db } from '../../lib/firebase/client'
 
 type SportKey = keyof typeof eventConfig
@@ -225,31 +225,13 @@ export default function AnimationsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Preview modal */}
-      <Modal
+      {/* Animation preview modal */}
+      <AnimationPreviewModal
         visible={preview.visible}
-        transparent
-        animationType="fade"
-        onRequestClose={closePreview}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Animation Preview</Text>
-            <Text style={styles.modalEvent}>{preview.eventLabel}</Text>
-            <View style={styles.modalAnimBadge}>
-              <Text style={styles.modalAnimText}>
-                {ANIMATION_OPTIONS.find((o) => o.id === preview.animStyle)?.label ?? 'None'}
-              </Text>
-            </View>
-            <Text style={styles.modalHint}>
-              Full preview available in issue #55
-            </Text>
-            <TouchableOpacity style={styles.modalClose} onPress={closePreview} activeOpacity={0.8}>
-              <Text style={styles.modalCloseText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        eventLabel={preview.eventLabel}
+        animStyle={preview.animStyle}
+        onClose={closePreview}
+      />
     </View>
   )
 }
@@ -385,65 +367,4 @@ const styles = StyleSheet.create({
   },
   continueButtonDisabled: { opacity: 0.6 },
   continueButtonText: { color: '#000000', fontSize: 16, fontWeight: '800' },
-  // Preview modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  modalCard: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 340,
-    alignItems: 'center',
-    gap: 12,
-  },
-  modalTitle: {
-    color: '#B3B3B3',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  modalEvent: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  modalAnimBadge: {
-    backgroundColor: '#1DB95420',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#1DB954',
-  },
-  modalAnimText: {
-    color: '#1DB954',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  modalHint: {
-    color: '#535353',
-    fontSize: 12,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  modalClose: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    marginTop: 4,
-  },
-  modalCloseText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
 })
