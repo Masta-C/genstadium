@@ -5,13 +5,12 @@
  * status (no video previews — ADR-005). LIVE badge + stream timer. Score display.
  * Score Keeper status + event count in bottom bar.
  *
- * Camera switching (tap card) is wired in issue #65.
  * Replay banner is wired in issue #78.
  * End Session is wired in issue #80.
  */
 
 import { router, useLocalSearchParams } from 'expo-router'
-import { collection, doc, onSnapshot } from 'firebase/firestore'
+import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   ScrollView,
@@ -71,6 +70,8 @@ export default function DirectorLiveScreen() {
   })
   const [eventCount, setEventCount] = useState(0)
   const [elapsed, setElapsed] = useState(0)
+  // Optimistic local override for activeSource — cleared when Firestore confirms
+  const [optimisticSource, setOptimisticSource] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -79,16 +80,19 @@ export default function DirectorLiveScreen() {
     const sessionUnsub = onSnapshot(doc(db, 'sessions', sessionId), (snap) => {
       if (!snap.exists()) return
       const data = snap.data()
+      const firestoreSource = (data.directorState?.activeSource as string | null) ?? null
       setSession({
         sessionName: (data.sessionName as string) ?? '',
         cameraSlots: (data.cameraSlots as CameraSlot[]) ?? [],
         teams: (data.teams as Team[]) ?? [],
         startedAt: (data.startedAt as { seconds: number } | null) ?? null,
         directorState: {
-          activeSource: (data.directorState?.activeSource as string | null) ?? null,
+          activeSource: firestoreSource,
           scorebugVisible: Boolean(data.directorState?.scorebugVisible),
         },
       })
+      // Clear optimistic override once Firestore has confirmed the write
+      setOptimisticSource((prev) => (prev === firestoreSource ? null : prev))
     })
 
     const participantsUnsub = onSnapshot(
@@ -150,9 +154,25 @@ export default function DirectorLiveScreen() {
     }
   }, [session?.startedAt])
 
+  // ── Camera source switch ───────────────────────────────────────────────────
+  async function switchSource(slotId: string) {
+    if (!sessionId) return
+    // Optimistic update — UI responds immediately before Firestore confirms
+    setOptimisticSource(slotId)
+    try {
+      await updateDoc(doc(db, 'sessions', sessionId), {
+        'directorState.activeSource': slotId,
+      })
+    } catch {
+      // Rollback optimistic update on failure
+      setOptimisticSource(null)
+    }
+  }
+
   // ── Derived state ──────────────────────────────────────────────────────────
   const slots = session?.cameraSlots ?? []
-  const activeSource = session?.directorState.activeSource ?? null
+  // Optimistic local override takes precedence; Firestore value as fallback
+  const activeSource = optimisticSource ?? session?.directorState.activeSource ?? null
 
   // Map slotId → participant for status lookup
   const participantBySlot: Record<string, Participant> = {}
@@ -219,13 +239,19 @@ export default function DirectorLiveScreen() {
               const participant = participantBySlot[slot.id]
               const isActive = activeSource === slot.id
               const dot = connectionDot(participant)
+              const isConnected = Boolean(participant)
 
               return (
                 <TouchableOpacity
                   key={slot.id}
-                  style={[styles.cameraCard, isActive && styles.cameraCardActive]}
-                  activeOpacity={0.8}
-                  // Tap-to-switch wired in #65
+                  style={[
+                    styles.cameraCard,
+                    isActive && styles.cameraCardActive,
+                    !isConnected && styles.cameraCardDisabled,
+                  ]}
+                  activeOpacity={isConnected ? 0.75 : 1}
+                  disabled={!isConnected || isActive}
+                  onPress={() => switchSource(slot.id)}
                 >
                   {/* LIVE badge */}
                   {isActive ? (
@@ -420,6 +446,9 @@ const styles = StyleSheet.create({
   cameraCardActive: {
     borderColor: '#CC0000',
     backgroundColor: '#1A0A0A',
+  },
+  cameraCardDisabled: {
+    opacity: 0.35,
   },
 
   // LIVE badge on active camera card
