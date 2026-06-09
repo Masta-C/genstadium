@@ -16,6 +16,7 @@ import { registerPrefetchRoute } from './replay/prefetch'
 import { registerInjectRoute } from './replay/inject'
 import { registerAnimationRoute } from './animation/render'
 import { registerLiveKitWebhook } from './webhooks/livekit'
+import { registerStripeWebhook } from './webhooks/stripe'
 
 // Initialise Firebase Admin SDK before any route handler uses it
 initAdminApp()
@@ -26,6 +27,7 @@ const app = express()
 // Webhook routes — MUST be before express.json() to receive raw body for HMAC
 // ---------------------------------------------------------------------------
 registerLiveKitWebhook(app)
+registerStripeWebhook(app)
 
 app.use(express.json())
 
