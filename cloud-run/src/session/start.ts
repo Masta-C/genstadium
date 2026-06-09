@@ -143,8 +143,10 @@ async function startHandler(req: Request, res: Response): Promise<void> {
       // Fallback: room composite if track SID not yet available
       egressB = await egressClient.startRoomCompositeEgress(sessionId, segmentedOutput)
     }
-    // end.ts reads egressBId OR egressIds.b — store as egressBId for consistency with egressA.ts
-    await sessionRef.update({ egressBId: egressB.egressId })
+    await sessionRef.update({
+      'egressIds.b': egressB.egressId,
+      replayCameraOnline: true,
+    })
   } catch (err) {
     // Egress B failure is non-fatal — stream is live via Egress A
     console.warn('[session/start] Egress B start failed (non-fatal):', (err as Error).message)

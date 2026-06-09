@@ -10,10 +10,11 @@
  */
 
 import express from 'express'
-import { WebhookReceiver } from 'livekit-server-sdk'
+import { EgressClient, WebhookReceiver } from 'livekit-server-sdk'
 import { getDb } from '../lib/firebase'
 import type { Router, Request, Response } from 'express'
 
+const LIVEKIT_HOST = process.env.LIVEKIT_URL ?? 'wss://localhost:7880'
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY ?? ''
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET ?? ''
 
@@ -34,12 +35,15 @@ async function livekitWebhookHandler(req: Request, res: Response): Promise<void>
     return
   }
 
-  // Auto-return to live source when a replay Ingress participant leaves
   if (event.event === 'participant_left') {
     const identity = event.participant?.identity ?? ''
     const roomName = event.room?.name ?? ''
-    if (identity.startsWith('replay-clip-') && roomName) {
-      await handleReplayEnded(roomName)
+    if (roomName && identity) {
+      if (identity.startsWith('replay-clip-')) {
+        await handleReplayEnded(roomName)
+      } else {
+        await handleCameraLeft(roomName, identity)
+      }
     }
   }
 
@@ -58,6 +62,31 @@ async function handleReplayEnded(sessionId: string): Promise<void> {
     'directorState.activeSource': previousSource ?? null,
     'directorState.previousSource': null,
   })
+}
+
+/** Stops Egress B and marks ISO Camera offline when it disconnects. */
+async function handleCameraLeft(sessionId: string, identity: string): Promise<void> {
+  const db = getDb()
+  const sessionRef = db.doc(`sessions/${sessionId}`)
+  const snap = await sessionRef.get()
+  if (!snap.exists) return
+
+  const data = snap.data()!
+  const replayCameraSlot = (data.replayCameraSlot as string | undefined) ?? 'cam_1'
+  if (identity !== replayCameraSlot) return
+
+  // ISO Camera left — stop Egress B and mark offline
+  const egressBId = (data['egressIds']?.b ?? data.egressBId) as string | undefined
+  if (egressBId) {
+    const egressClient = new EgressClient(LIVEKIT_HOST, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+    try {
+      await egressClient.stopEgress(egressBId)
+    } catch (err) {
+      console.warn('[webhooks/livekit] stopEgress B warning:', String(err))
+    }
+  }
+
+  await sessionRef.update({ replayCameraOnline: false })
 }
 
 /**
