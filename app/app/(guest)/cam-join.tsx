@@ -12,39 +12,9 @@ import {
   View,
 } from 'react-native'
 import { auth } from '../../lib/firebase/client'
-import { useSessionStore } from '../../store/sessionStore'
-
-const CLOUD_RUN_URL =
-  (process.env.EXPO_PUBLIC_CLOUD_RUN_URL ?? 'http://localhost:8081').replace(/\/$/, '')
-
-interface JoinResponse {
-  liveKitToken: string
-  sessionId: string
-}
-
-async function joinSession(
-  joinCode: string,
-  displayName: string,
-  idToken: string,
-): Promise<JoinResponse> {
-  const res = await fetch(`${CLOUD_RUN_URL}/session/join`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify({ joinCode, role: 'camera', displayName }),
-  })
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { message?: string }
-    throw new Error(body.message ?? `Server error ${res.status}`)
-  }
-  return res.json() as Promise<JoinResponse>
-}
 
 export default function CamJoinScreen() {
   const { joinCode } = useLocalSearchParams<{ joinCode: string }>()
-  const { setSession } = useSessionStore()
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -58,13 +28,11 @@ export default function CamJoinScreen() {
     setSubmitting(true)
     setError('')
     try {
-      const { user } = await signInAnonymously(auth)
-      const idToken = await user.getIdToken()
-      const { liveKitToken, sessionId } = await joinSession(joinCode, trimmed, idToken)
-      setSession(sessionId, liveKitToken)
+      // Anonymous auth only — LiveKit token is issued after slot selection (#61)
+      await signInAnonymously(auth)
       router.replace({
         pathname: '/(guest)/pick-slot',
-        params: { sessionId },
+        params: { joinCode, displayName: trimmed },
       })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to join. Please try again.')
