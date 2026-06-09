@@ -13,7 +13,7 @@
  * fails, the session still goes live — Egress A is the primary stream.
  */
 
-import { EgressClient, GCPUpload, RoomServiceClient, SegmentedFileOutput, SegmentedFileProtocol } from 'livekit-server-sdk'
+import { EgressClient, GCPUpload, RoomServiceClient, SegmentedFileOutput, SegmentedFileProtocol, TrackType } from 'livekit-server-sdk'
 import { z } from 'zod'
 import { FieldValue } from 'firebase-admin/firestore'
 import { requireAuth, type VerifiedToken } from '../middleware/auth'
@@ -72,9 +72,24 @@ async function startHandler(req: Request, res: Response): Promise<void> {
     return
   }
 
-  // ── Create Room (idempotent) ─────────────────────────────────────────────
+  // ── Create Room (idempotent) + verify ISO Camera is present ─────────────
   const roomClient = new RoomServiceClient(LIVEKIT_HOST, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
   await roomClient.createRoom({ name: sessionId })
+
+  // Defensive ISO Camera check — Lobby should have blocked, but guard here too
+  const replayCameraSlot = (sessionData.replayCameraSlot as string | undefined) ?? 'cam_1'
+  const roomParticipants = await roomClient.listParticipants(sessionId)
+  const isoParticipant = roomParticipants.find((p) => p.identity === replayCameraSlot)
+  if (!isoParticipant) {
+    res.status(400).json({
+      error: 'ISO_CAMERA_NOT_READY',
+      message: `ISO Camera (${replayCameraSlot}) is not in the Room. Wait for camera operator to join.`,
+    })
+    return
+  }
+
+  // Get ISO Camera video track ID for targeted Egress B recording
+  const isoVideoTrack = isoParticipant.tracks.find((t) => t.type === TrackType.VIDEO)
 
   // Set initial director state if startingSource provided
   if (startingSource) {
@@ -104,24 +119,31 @@ async function startHandler(req: Request, res: Response): Promise<void> {
   })
 
   // ── Start Egress B — DVR segments → GCS (best-effort; stream already live) ─
-  // TODO(#77): Once Ingress/participant track IDs are available at start time,
-  // replace with startTrackCompositeEgress targeting replayCameraSlot identity.
-  // For now, room composite segmented recording serves as the DVR buffer.
+  // ── Egress B — DVR segments → GCS (ISO Camera track only) ───────────────
   const egressClient = new EgressClient(LIVEKIT_HOST, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
-  const replayCameraSlot = (sessionData.replayCameraSlot as string | undefined) ?? 'cam_1'
+  const segmentedOutput = new SegmentedFileOutput({
+    protocol: SegmentedFileProtocol.HLS_PROTOCOL,
+    filenamePrefix: `dvr/${sessionId}/${replayCameraSlot}/`,
+    segmentDuration: DVR_SEGMENT_SECONDS,
+    output: {
+      case: 'gcp',
+      value: new GCPUpload({ bucket: DVR_BUCKET }),
+    },
+  })
   try {
-    const egressB = await egressClient.startRoomCompositeEgress(
-      sessionId,
-      new SegmentedFileOutput({
-        protocol: SegmentedFileProtocol.HLS_PROTOCOL,
-        filenamePrefix: `dvr/${sessionId}/${replayCameraSlot}/`,
-        segmentDuration: DVR_SEGMENT_SECONDS,
-        output: {
-          case: 'gcp',
-          value: new GCPUpload({ bucket: DVR_BUCKET }),
-        },
-      }),
-    )
+    let egressB
+    if (isoVideoTrack?.sid) {
+      // Target ISO Camera video track directly (ADR-007: Egress B = ISO Camera only)
+      egressB = await egressClient.startTrackCompositeEgress(
+        sessionId,
+        segmentedOutput,
+        { videoTrackId: isoVideoTrack.sid },
+      )
+    } else {
+      // Fallback: room composite if track SID not yet available
+      egressB = await egressClient.startRoomCompositeEgress(sessionId, segmentedOutput)
+    }
+    // end.ts reads egressBId OR egressIds.b — store as egressBId for consistency with egressA.ts
     await sessionRef.update({ egressBId: egressB.egressId })
   } catch (err) {
     // Egress B failure is non-fatal — stream is live via Egress A

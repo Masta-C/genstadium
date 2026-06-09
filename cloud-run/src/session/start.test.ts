@@ -2,6 +2,8 @@
 const mockCreateRoom = jest.fn().mockResolvedValue({})
 const mockStartTrackCompositeEgress = jest.fn().mockResolvedValue({ egressId: 'egress-b-id' })
 
+const mockListParticipants = jest.fn()
+
 jest.mock('livekit-server-sdk', () => ({
   EgressClient: jest.fn().mockImplementation(() => ({
     startTrackCompositeEgress: mockStartTrackCompositeEgress,
@@ -10,10 +12,12 @@ jest.mock('livekit-server-sdk', () => ({
   })),
   RoomServiceClient: jest.fn().mockImplementation(() => ({
     createRoom: mockCreateRoom,
+    listParticipants: (...args: unknown[]) => mockListParticipants(...args),
   })),
   SegmentedFileOutput: jest.fn().mockImplementation((opts) => opts),
   SegmentedFileProtocol: { HLS_PROTOCOL: 1 },
   GCPUpload: jest.fn().mockImplementation((opts) => opts),
+  TrackType: { VIDEO: 0 },
 }))
 
 // ── egressA helpers mock ─────────────────────────────────────────────────────
@@ -88,6 +92,11 @@ function makeCreditsSnap(balance: number) {
 
 beforeEach(() => {
   jest.clearAllMocks()
+
+  // Default: ISO Camera 'cam_1' is in Room with a video track
+  mockListParticipants.mockResolvedValue([
+    { identity: 'cam_1', tracks: [{ type: 0, sid: 'TR_cam1_video' }] },
+  ])
 
   mockDoc.mockImplementation((path: string) => {
     return {
@@ -216,5 +225,34 @@ describe('POST /session/start', () => {
       .send({ sessionId: 'sess1' })
 
     expect(callOrder).toEqual(['egressA_started', 'egressA_active', 'credits_decremented'])
+  })
+
+  it('returns 400 ISO_CAMERA_NOT_READY when ISO Camera is not in Room', async () => {
+    mockListParticipants.mockResolvedValueOnce([]) // no participants
+
+    const app = buildApp()
+    const res = await request(app)
+      .post('/session/start')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ sessionId: 'sess1' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('ISO_CAMERA_NOT_READY')
+    expect(mockStartEgressA).not.toHaveBeenCalled()
+  })
+
+  it('uses ISO Camera video track ID for targeted Egress B', async () => {
+    const app = buildApp()
+    await request(app)
+      .post('/session/start')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ sessionId: 'sess1' })
+
+    // startTrackCompositeEgress called with the ISO Camera's video track SID
+    expect(mockStartTrackCompositeEgress).toHaveBeenCalledWith(
+      'sess1',
+      expect.anything(),
+      expect.objectContaining({ videoTrackId: 'TR_cam1_video' }),
+    )
   })
 })
