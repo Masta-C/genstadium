@@ -1,14 +1,21 @@
 // ── LiveKit SDK mocks ─────────────────────────────────────────────────────────
 const mockStopEgress = jest.fn().mockResolvedValue(undefined)
+const mockListEgress = jest.fn().mockResolvedValue([])
+const mockStartTrackCompositeEgress = jest.fn().mockResolvedValue({ egressId: 'egress-b-new' })
 const mockReceive = jest.fn()
 
 jest.mock('livekit-server-sdk', () => ({
   EgressClient: jest.fn().mockImplementation(() => ({
     stopEgress: mockStopEgress,
+    listEgress: mockListEgress,
+    startTrackCompositeEgress: mockStartTrackCompositeEgress,
   })),
   WebhookReceiver: jest.fn().mockImplementation(() => ({
     receive: mockReceive,
   })),
+  SegmentedFileOutput: jest.fn().mockImplementation((opts) => opts),
+  SegmentedFileProtocol: { HLS_PROTOCOL: 1 },
+  GCPUpload: jest.fn().mockImplementation((opts) => opts),
 }))
 
 // ── Firebase mock ─────────────────────────────────────────────────────────────
@@ -185,6 +192,93 @@ describe('POST /webhooks/livekit', () => {
       expect(res.status).toBe(200)
       // Still marks offline even if stop failed
       expect(mockDocUpdate).toHaveBeenCalledWith({ replayCameraOnline: false })
+    })
+  })
+
+  describe('participant_joined — ISO Camera reconnect', () => {
+    function makeJoinedEvent(identity: string, roomName: string) {
+      return {
+        event: 'participant_joined',
+        participant: { identity },
+        room: { name: roomName },
+      }
+    }
+
+    it('does nothing when joined participant is not ISO Camera', async () => {
+      mockReceive.mockResolvedValueOnce(makeJoinedEvent('cam_2', 'session-1'))
+      const app = buildApp()
+      const res = await request(app)
+        .post('/webhooks/livekit')
+        .set('Authorization', 'Bearer token')
+        .set('Content-Type', 'application/octet-stream')
+        .send(Buffer.from('{}'))
+      expect(res.status).toBe(200)
+      expect(mockStartTrackCompositeEgress).not.toHaveBeenCalled()
+      expect(mockDocUpdate).not.toHaveBeenCalled()
+    })
+
+    it('does nothing when session is not live', async () => {
+      mockReceive.mockResolvedValueOnce(makeJoinedEvent('cam_1', 'session-1'))
+      mockDoc.mockImplementation((_path: string) => ({
+        get: () => Promise.resolve(makeSessionSnap({ replayCameraSlot: 'cam_1', status: 'lobby' })),
+        update: mockDocUpdate,
+      }))
+      const app = buildApp()
+      const res = await request(app)
+        .post('/webhooks/livekit')
+        .set('Authorization', 'Bearer token')
+        .set('Content-Type', 'application/octet-stream')
+        .send(Buffer.from('{}'))
+      expect(res.status).toBe(200)
+      expect(mockStartTrackCompositeEgress).not.toHaveBeenCalled()
+    })
+
+    it('skips restart when Egress B is already active (idempotency)', async () => {
+      mockReceive.mockResolvedValueOnce(makeJoinedEvent('cam_1', 'session-1'))
+      // listEgress returns the current Egress B as active
+      mockListEgress.mockResolvedValueOnce([{ egressId: 'egress-b-id' }])
+      const app = buildApp()
+      const res = await request(app)
+        .post('/webhooks/livekit')
+        .set('Authorization', 'Bearer token')
+        .set('Content-Type', 'application/octet-stream')
+        .send(Buffer.from('{}'))
+      expect(res.status).toBe(200)
+      expect(mockStartTrackCompositeEgress).not.toHaveBeenCalled()
+    })
+
+    it('restarts Egress B and writes new egressIds.b + replayCameraOnline=true', async () => {
+      mockReceive.mockResolvedValueOnce(makeJoinedEvent('cam_1', 'session-1'))
+      mockListEgress.mockResolvedValueOnce([]) // no active egress
+      const app = buildApp()
+      const res = await request(app)
+        .post('/webhooks/livekit')
+        .set('Authorization', 'Bearer token')
+        .set('Content-Type', 'application/octet-stream')
+        .send(Buffer.from('{}'))
+      expect(res.status).toBe(200)
+      expect(mockStartTrackCompositeEgress).toHaveBeenCalledWith(
+        'session-1',
+        expect.anything(),
+        expect.anything(),
+      )
+      expect(mockDocUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ 'egressIds.b': 'egress-b-new', replayCameraOnline: true }),
+      )
+    })
+
+    it('still writes replayCameraOnline=true if Egress B restart fails', async () => {
+      mockReceive.mockResolvedValueOnce(makeJoinedEvent('cam_1', 'session-1'))
+      mockListEgress.mockResolvedValueOnce([])
+      mockStartTrackCompositeEgress.mockRejectedValueOnce(new Error('egress failed'))
+      const app = buildApp()
+      const res = await request(app)
+        .post('/webhooks/livekit')
+        .set('Authorization', 'Bearer token')
+        .set('Content-Type', 'application/octet-stream')
+        .send(Buffer.from('{}'))
+      expect(res.status).toBe(200)
+      expect(mockDocUpdate).toHaveBeenCalledWith({ replayCameraOnline: true })
     })
   })
 })
