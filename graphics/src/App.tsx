@@ -1,4 +1,5 @@
 import React from 'react'
+import Scorebug from './components/Scorebug'
 
 function useSessionId(): string | null {
   const params = new URLSearchParams(window.location.search)
@@ -18,9 +19,9 @@ export default function App() {
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-transparent">
-      {/* Scorebug and overlays rendered here — see issues #48, #50 */}
-      <div className="absolute bottom-4 right-4 text-xs text-text-disabled">
-        session: {sessionId}
+      {/* Scorebug — bottom-right, max-width 320px per issue #48 */}
+      <div className="absolute bottom-4 right-4">
+        <Scorebug sessionId={sessionId} />
       </div>
     </div>
   )
