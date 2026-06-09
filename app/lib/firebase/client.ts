@@ -42,9 +42,11 @@ declare global {
   }
 }
 
-const IS_DEV = __DEV__ ?? false
+// Use EXPO_PUBLIC_USE_EMULATOR (set by eas.json dev profile) rather than __DEV__
+// so preview/production builds never accidentally hit the emulator even if __DEV__ is true.
+const USE_EMULATOR = process.env.EXPO_PUBLIC_USE_EMULATOR === 'true'
 
-if (IS_DEV && !globalThis.window?.__gsEmulatorsConnected) {
+if (USE_EMULATOR && !globalThis.window?.__gsEmulatorsConnected) {
   connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true })
   connectFirestoreEmulator(db, 'localhost', 8080)
 

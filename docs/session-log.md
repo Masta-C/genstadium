@@ -43,3 +43,4 @@
 2026-06-09 | #88 credit-balance-display | PR https://github.com/Masta-C/genstadium/pull/167 | NOTE: balance at users/{uid}/credits/balance doc; null while loading prevents flash of 0
 2026-06-09 | #91 animation-trigger | PR https://github.com/Masta-C/genstadium/pull/168 | NOTE: replay-clip- prefix used for anim Ingress identity so existing webhook handles auto-return; unmapped eventTypes silently skipped
 2026-06-09 | #77 replay-broadcast-ingress | PR https://github.com/Masta-C/genstadium/pull/169 | NOTE: reads gcsPath from replayClips/{clipId} doc; object name stripped from gs:// prefix; ingressId written back to clip doc
+2026-06-09 | #94 iso-camera-reconnect | PR https://github.com/Masta-C/genstadium/pull/170 | NOTE: listEgress idempotency check by egressId match; Egress B restart failure non-fatal; lobby joins ignored
