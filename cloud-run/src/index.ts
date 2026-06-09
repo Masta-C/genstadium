@@ -12,11 +12,19 @@ import express, { NextFunction, Request, Response } from 'express'
 import { initAdminApp } from './lib/firebase'
 import { registerJoinRoute } from './session/join'
 import { registerPrefetchRoute } from './replay/prefetch'
+import { registerInjectRoute } from './replay/inject'
+import { registerLiveKitWebhook } from './webhooks/livekit'
 
 // Initialise Firebase Admin SDK before any route handler uses it
 initAdminApp()
 
 const app = express()
+
+// ---------------------------------------------------------------------------
+// Webhook routes — MUST be before express.json() to receive raw body for HMAC
+// ---------------------------------------------------------------------------
+registerLiveKitWebhook(app)
+
 app.use(express.json())
 
 // ---------------------------------------------------------------------------
@@ -31,6 +39,7 @@ app.get('/health', (_req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 registerJoinRoute(app)
 registerPrefetchRoute(app)
+registerInjectRoute(app)
 
 // ---------------------------------------------------------------------------
 // Global error handler — converts unhandled errors to structured JSON
