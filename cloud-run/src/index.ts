@@ -10,6 +10,7 @@
 
 import express, { NextFunction, Request, Response } from 'express'
 import { initAdminApp } from './lib/firebase'
+import { registerJoinRoute } from './session/join'
 
 // Initialise Firebase Admin SDK before any route handler uses it
 initAdminApp()
@@ -25,9 +26,9 @@ app.get('/health', (_req: Request, res: Response) => {
 })
 
 // ---------------------------------------------------------------------------
-// API routes — wired in as they are implemented
-// (see issues #59 session/join, #69 session/start, etc.)
+// API routes
 // ---------------------------------------------------------------------------
+registerJoinRoute(app)
 
 // ---------------------------------------------------------------------------
 // Global error handler — converts unhandled errors to structured JSON
