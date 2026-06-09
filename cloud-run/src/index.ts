@@ -15,6 +15,7 @@ import { registerEndRoute } from './session/end'
 import { registerPrefetchRoute } from './replay/prefetch'
 import { registerInjectRoute } from './replay/inject'
 import { registerAnimationRoute } from './animation/render'
+import { registerVerifyReceiptRoute } from './iap/verifyReceipt'
 import { registerLiveKitWebhook } from './webhooks/livekit'
 import { registerStripeWebhook } from './webhooks/stripe'
 
@@ -46,6 +47,7 @@ registerEndRoute(app)
 registerPrefetchRoute(app)
 registerInjectRoute(app)
 registerAnimationRoute(app)
+registerVerifyReceiptRoute(app)
 
 // ---------------------------------------------------------------------------
 // Global error handler — converts unhandled errors to structured JSON
