@@ -8,7 +8,7 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +20,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # continue-on-error: true until docs/audit-accepted.md is reviewed — see #179
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
 
       - name: Setup Java 21 (required by Firebase emulator)
         uses: actions/setup-java@v4
@@ -33,22 +38,26 @@ jobs:
       - name: Lint (all workspaces)
         run: npm run lint
 
+      # Coverage gate: 70% lines + functions for cloud-run (configured in jest.config.js).
+      # App and graphics use passWithNoTests until their test suites exist — see #176, #177.
       - name: Unit tests — Cloud Run
-        run: npm test --workspace=cloud-run
+        run: npm test --workspace=cloud-run -- --coverage
 
       # The Firestore rules tests require a live emulator.
       # firebase-tools is bundled with the repo devDependencies so no global install needed.
       # We start only the Firestore emulator (auth not required for rules unit tests).
+      # Readiness check uses the emulator hub HTTP endpoint (port 4400) — more reliable than TCP.
       - name: Start Firestore emulator
         run: |
           npx firebase emulators:start --only firestore --project genstadium-2321 &
           echo "EMULATOR_PID=$!" >> $GITHUB_ENV
-          npx wait-on tcp:8080 --timeout 30000
+          npx wait-on http://localhost:4400 --timeout 30000
 
       - name: Unit tests — Firestore rules
         run: npm run test:rules --workspace=cloud-run
         env:
           FIRESTORE_EMULATOR_HOST: localhost:8080
+          FIRESTORE_COVERAGE_URL: http://localhost:4400/emulator/v1/projects/genstadium-2321:ruleCoverage.html
 
       - name: Stop Firestore emulator
         if: always()
@@ -59,3 +68,15 @@ jobs:
 
       - name: Unit tests — Graphics
         run: npm test --workspace=graphics
+
+      # Dry build verification — produces bundles but deploys nothing.
+      # Catches broken imports and misconfigured env vars that only surface at bundle time.
+      - name: Build — Cloud Run
+        run: npm run build --workspace=@genstadium/cloud-run
+        env:
+          NODE_ENV: production
+
+      - name: Build — Graphics
+        run: npm run build --workspace=@genstadium/graphics
+        env:
+          VITE_FIREBASE_PROJECT_ID: genstadium-2321
