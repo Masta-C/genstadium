@@ -1,15 +1,50 @@
-import express from 'express'
+/**
+ * index.ts — GenStadium Cloud Run Express app.
+ *
+ * All routes are JWT-verified via requireAuth middleware.
+ * All POST/PATCH bodies are Zod-validated via validate() middleware.
+ * Structured JSON error responses for all error paths.
+ *
+ * Local dev: npm run dev → http://localhost:8081
+ */
+
+import express, { NextFunction, Request, Response } from 'express'
+import { initAdminApp } from './lib/firebase'
+
+// Initialise Firebase Admin SDK before any route handler uses it
+initAdminApp()
 
 const app = express()
 app.use(express.json())
 
-app.get('/health', (_req, res) => {
+// ---------------------------------------------------------------------------
+// Health check — no auth required (Cloud Run health probe + uptime check)
+// ---------------------------------------------------------------------------
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' })
 })
 
+// ---------------------------------------------------------------------------
+// API routes — wired in as they are implemented
+// (see issues #59 session/join, #69 session/start, etc.)
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Global error handler — converts unhandled errors to structured JSON
+// ---------------------------------------------------------------------------
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[cloud-run] unhandled error:', err)
+  const message =
+    err instanceof Error ? err.message : 'Internal server error'
+  res.status(500).json({ error: 'INTERNAL_ERROR', message })
+})
+
+// ---------------------------------------------------------------------------
+// Start server
+// ---------------------------------------------------------------------------
 const PORT = process.env.PORT ?? 8081
 app.listen(PORT, () => {
-  console.log(`Cloud Run listening on :${PORT}`)
+  console.log(`[cloud-run] listening on :${PORT}`)
 })
 
 export default app
