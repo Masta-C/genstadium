@@ -27,3 +27,8 @@
 2026-06-07 | #14 director-auth-screens | PR https://github.com/Masta-C/genstadium/pull/105 | NOTE: (auth)/_layout.tsx is pass-through (no redirect) to prevent bounce-back-to-login bug; role read from Firestore users/{uid}.role
 2026-06-07 | #15 google-signin | PR https://github.com/Masta-C/genstadium/pull/106 | NOTE: REVERSED_CLIENT_ID in infoPlist; LINK_REQUIRED error for account merging; dev build only
 2026-06-07 | #16 auth-guard-root-layout | PR https://github.com/Masta-C/genstadium/pull/108 | NOTE: index.tsx redirects to director/home — root guard ensures it only renders when user!=null
+2026-06-09 | #78 replay-ready-banner | PR https://github.com/Masta-C/genstadium/pull/157 | NOTE: prefetch.ts writes latestReplayClip to session doc; bannerElapsed timer deps on readyAt.seconds
+2026-06-09 | #79 broadcast-replay | PR https://github.com/Masta-C/genstadium/pull/158 | NOTE: webhook registered before express.json() for raw body; previousSource saved for auto-return
+2026-06-09 | #80 end-session | PR https://github.com/Masta-C/genstadium/pull/159 | NOTE: supports both egressAId and egressIds.a field layouts; stop failures are warnings not errors
+2026-06-09 | #90 remotion-compositions | PR https://github.com/Masta-C/genstadium/pull/160 | NOTE: renderMedia mocked in tests; runtime needs CHROMIUM_PATH env + chromium binary in container
+2026-06-09 | BLOCKED | All remaining ready-for-agent issues blocked via #85 (ready-for-human: App Store Connect IAP setup)
