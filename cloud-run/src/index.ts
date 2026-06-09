@@ -11,6 +11,7 @@
 import express, { NextFunction, Request, Response } from 'express'
 import { initAdminApp } from './lib/firebase'
 import { registerJoinRoute } from './session/join'
+import { registerPrefetchRoute } from './replay/prefetch'
 
 // Initialise Firebase Admin SDK before any route handler uses it
 initAdminApp()
@@ -29,6 +30,7 @@ app.get('/health', (_req: Request, res: Response) => {
 // API routes
 // ---------------------------------------------------------------------------
 registerJoinRoute(app)
+registerPrefetchRoute(app)
 
 // ---------------------------------------------------------------------------
 // Global error handler — converts unhandled errors to structured JSON
