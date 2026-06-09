@@ -1,0 +1,132 @@
+name: Production Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # ── CI gate — identical checks to PR CI ───────────────────────────────────
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Java 21 (required by Firebase emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Typecheck (all workspaces)
+        run: npm run typecheck
+
+      - name: Lint (all workspaces)
+        run: npm run lint
+
+      - name: Unit tests — Cloud Run
+        run: npm test --workspace=@genstadium/cloud-run
+
+      - name: Start Firestore emulator
+        run: |
+          npx firebase emulators:start --only firestore --project genstadium-2321 &
+          echo "EMULATOR_PID=$!" >> $GITHUB_ENV
+          npx wait-on tcp:8080 --timeout 30000
+
+      - name: Unit tests — Firestore rules
+        run: npm run test:rules --workspace=@genstadium/cloud-run
+        env:
+          FIRESTORE_EMULATOR_HOST: localhost:8080
+
+      - name: Stop Firestore emulator
+        if: always()
+        run: kill $EMULATOR_PID || true
+
+      - name: Unit tests — App
+        run: npm test --workspace=@genstadium/app
+
+      - name: Unit tests — Graphics
+        run: npm test --workspace=@genstadium/graphics
+
+  # ── Deploy — requires production environment approval ─────────────────────
+  deploy:
+    name: deploy
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    permissions:
+      contents: write  # needed to push git tag
+      id-token: write  # needed for GCP OIDC (if switching from key to OIDC later)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── GCP auth ────────────────────────────────────────────────────────────
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # ── Build graphics ───────────────────────────────────────────────────────
+      - name: Build graphics
+        run: npm run build --workspace=@genstadium/graphics
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_PROJECT_ID }}.firebaseapp.com
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_PROJECT_ID }}.appspot.com
+
+      # ── Firebase Hosting (graphics) + Firestore rules + indexes ─────────────
+      - name: Deploy Firebase (Hosting + Firestore rules + indexes)
+        run: npx firebase deploy --only hosting,firestore:rules,firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }}
+
+      # ── Cloud Run ────────────────────────────────────────────────────────────
+      - name: Deploy Cloud Run
+        run: |
+          gcloud run deploy genstadium-cloud-run \
+            --source cloud-run/ \
+            --region asia-south1 \
+            --project ${{ secrets.FIREBASE_PROJECT_ID }} \
+            --quiet
+
+      # ── EAS Update (OTA JS-layer only — no native rebuild) ──────────────────
+      - name: EAS Update — production branch
+        run: |
+          npm install -g eas-cli
+          eas update --branch production --message "Deploy ${{ github.sha }}" --non-interactive
+        working-directory: app
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      # ── Git tag ──────────────────────────────────────────────────────────────
+      - name: Create release tag
+        run: |
+          VERSION=$(node -p "require('./app/package.json').version")
+          TAG="v${VERSION}-$(date -u +%Y%m%d%H%M%S)"
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git tag "$TAG"
+          git push origin "$TAG"
