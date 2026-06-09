@@ -1,4 +1,4 @@
-import { handlePrefetchTrigger } from './index'
+import { handlePrefetchTrigger, handleAnimationTrigger } from './index'
 
 // Mock firebase-admin before import
 jest.mock('firebase-admin', () => {
@@ -90,6 +90,41 @@ describe('handlePrefetchTrigger', () => {
     mockFetch.mockRejectedValue(new Error('network failure'))
     await expect(
       handlePrefetchTrigger('sess1', { triggers: ['prefetch'] }, 'http://cloud-run'),
+    ).resolves.not.toThrow()
+  })
+})
+
+describe('handleAnimationTrigger', () => {
+  it('does nothing when triggers does not include animation', async () => {
+    await handleAnimationTrigger('sess1', 'evt1', { triggers: ['prefetch'], eventType: 'goal' }, 'http://cloud-run')
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when triggers is absent', async () => {
+    await handleAnimationTrigger('sess1', 'evt1', {}, 'http://cloud-run')
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('calls /replay/animation with sessionId, eventId, eventType when triggers includes animation', async () => {
+    await handleAnimationTrigger(
+      'sess1',
+      'evt1',
+      { triggers: ['animation'], eventType: 'goal' },
+      'http://cloud-run',
+    )
+
+    expect(mockFetch).toHaveBeenCalledWith('http://cloud-run/replay/animation', expect.objectContaining({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string)
+    expect(body).toEqual({ sessionId: 'sess1', eventId: 'evt1', eventType: 'goal' })
+  })
+
+  it('swallows fetch errors without throwing', async () => {
+    mockFetch.mockRejectedValue(new Error('network failure'))
+    await expect(
+      handleAnimationTrigger('sess1', 'evt1', { triggers: ['animation'], eventType: 'goal' }, 'http://cloud-run'),
     ).resolves.not.toThrow()
   })
 })
