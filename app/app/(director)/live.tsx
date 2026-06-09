@@ -154,6 +154,15 @@ export default function DirectorLiveScreen() {
     }
   }, [session?.startedAt])
 
+  // ── Scorebug toggle ───────────────────────────────────────────────────────
+  async function toggleScorebug() {
+    if (!sessionId) return
+    const current = session?.directorState.scorebugVisible ?? true
+    await updateDoc(doc(db, 'sessions', sessionId), {
+      'directorState.scorebugVisible': !current,
+    }).catch(() => {/* silent — next snapshot will resync */})
+  }
+
   // ── Camera source switch ───────────────────────────────────────────────────
   async function switchSource(slotId: string) {
     if (!sessionId) return
@@ -297,6 +306,22 @@ export default function DirectorLiveScreen() {
             · {eventCount} event{eventCount !== 1 ? 's' : ''}
           </Text>
         </View>
+
+        {/* Scorebug toggle */}
+        <TouchableOpacity
+          style={[
+            styles.scorebugToggle,
+            session?.directorState.scorebugVisible
+              ? styles.scorebugToggleOn
+              : styles.scorebugToggleOff,
+          ]}
+          onPress={toggleScorebug}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.scorebugToggleText}>
+            📊 {session?.directorState.scorebugVisible ? 'ON' : 'OFF'}
+          </Text>
+        </TouchableOpacity>
 
         {/* End Session — wired in #80 */}
         <TouchableOpacity
@@ -519,6 +544,22 @@ const styles = StyleSheet.create({
   },
   skStatus: { flex: 1 },
   skLabel: { color: '#B3B3B3', fontSize: 13 },
+
+  scorebugToggle: {
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+  },
+  scorebugToggleOn: {
+    backgroundColor: '#0D2B14',
+    borderColor: '#1DB954',
+  },
+  scorebugToggleOff: {
+    backgroundColor: '#2A1A0A',
+    borderColor: '#CC5500',
+  },
+  scorebugToggleText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
 
   endButton: {
     backgroundColor: '#2A0A0A',
