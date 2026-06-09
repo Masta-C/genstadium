@@ -133,7 +133,7 @@ export default function LobbyScreen() {
 
   function handleGoLive() {
     if (!isISOConnected) return
-    router.push({ pathname: '/(director)/live-setup', params: { sessionId } })
+    router.push({ pathname: '/(director)/youtube', params: { sessionId } })
   }
 
   const goLiveLabel = isISOConnected
