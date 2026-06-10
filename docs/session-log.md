@@ -54,3 +54,5 @@
 2026-06-09 | #178 cloud-run-integration-tests | PR https://github.com/Masta-C/genstadium/pull/184 | NOTE: emulator needs Java 21; local validation requires npm run emulators; not added to CI per spec
 2026-06-09 | #179 npm-audit-triage | PR https://github.com/Masta-C/genstadium/pull/185 | NOTE: all 17 HIGH/CRIT are build-time or dev-tool; continue-on-error stays until human reviews audit-accepted.md
 2026-06-09 | audit-gate-enabled | PR https://github.com/Masta-C/genstadium/pull/186 | NOTE: gate is --audit-level=critical --omit=dev (not high); HIGH gate needs expo@56+firebase@12 to unblock
+2026-06-10 | #187 eas-preview-env-vars | PR https://github.com/Masta-C/genstadium/pull/201 | NOTE: EXPO_PUBLIC_FIREBASE_API_KEY must be set via eas env:create separately; storage bucket is firebasestorage.app not appspot.com
+2026-06-10 | #188 functions-deploy | PR https://github.com/Masta-C/genstadium/pull/202 | NOTE: build step required (dist/index.js entry); ordered after Firestore indexes before Cloud Run
