@@ -24,7 +24,6 @@ import React, {
 import {
   Alert,
   Animated,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -33,6 +32,7 @@ import {
 } from 'react-native'
 import { db } from '../lib/firebase/client'
 import { EventButtons } from './EventButtons'
+import { OverCompleteModal } from './OverCompleteModal'
 
 interface Team {
   id: string
@@ -310,53 +310,13 @@ export const CricketPanel = forwardRef<CricketPanelRef, CricketPanelProps>(funct
       </View>
 
       {/* Over Complete modal — fires when 6th legal ball is bowled */}
-      <Modal
-        visible={showOverModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowOverModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>✅ Over {completedOverNumber} complete</Text>
-            <Text style={styles.modalSubtitle}>Who bowls next?</Text>
-
-            <ScrollView style={styles.bowlerList} showsVerticalScrollIndicator={false}>
-              {bowlingPlayers.length === 0 ? (
-                <TouchableOpacity
-                  style={styles.bowlerButton}
-                  onPress={() => handleBowlerSelect('Unknown')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.bowlerName}>Unknown bowler</Text>
-                </TouchableOpacity>
-              ) : (
-                bowlingPlayers.map((p) => (
-                  <TouchableOpacity
-                    key={p.id}
-                    style={styles.bowlerButton}
-                    onPress={() => handleBowlerSelect(p.name)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.jerseyBadge}>
-                      <Text style={styles.jerseyText}>{p.jerseyNumber}</Text>
-                    </View>
-                    <Text style={styles.bowlerName}>{p.name}</Text>
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
-
-            <TouchableOpacity
-              style={styles.skipBowlerButton}
-              onPress={() => setShowOverModal(false)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.skipBowlerText}>Skip — set bowler later</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {showOverModal && (
+        <OverCompleteModal
+          overNumber={completedOverNumber}
+          bowlingPlayers={bowlingPlayers}
+          onSelectBowler={handleBowlerSelect}
+        />
+      )}
     </View>
   )
 })
@@ -464,53 +424,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   buttons: { flex: 1 },
-  // Over Complete modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: '#1E1E1E',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    maxHeight: '70%',
-  },
-  modalTitle: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  modalSubtitle: {
-    color: '#B3B3B3',
-    fontSize: 14,
-    marginBottom: 16,
-  },
-  bowlerList: {
-    maxHeight: 240,
-    marginBottom: 12,
-  },
-  bowlerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2A2A2A',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 8,
-    gap: 12,
-  },
-  jerseyBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 6,
-    backgroundColor: '#1A1A1A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  jerseyText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  bowlerName: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
-  skipBowlerButton: { alignItems: 'center', paddingVertical: 12 },
-  skipBowlerText: { color: '#535353', fontSize: 13, textDecorationLine: 'underline' },
 })
