@@ -24,7 +24,6 @@ import React, {
 import {
   Alert,
   Animated,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
