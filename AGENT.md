@@ -320,6 +320,27 @@ NEXT: ready for next iteration
 
 ---
 
+## Current queue (as of 2026-06-10)
+
+Issues are auto-discovered via `gh issue list --label ready-for-agent`. The loop always picks the **lowest-numbered unblocked issue**. Current queue in order:
+
+| Priority | Issue | Title | Blocked by |
+|---|---|---|---|
+| 1 | #187 | `eas.json`: add real Firebase env vars to preview + production profiles | — |
+| 2 | #188 | `production-deploy.yml`: add Cloud Functions deploy step | — |
+| 3 | #189 | Wire OverCompleteModal into CricketPanel | — |
+| 4 | #190 | QA demo plan: 3-device Android test script + pre-flight checklist | — |
+| 5 | #191 | Cloud Run smoke test script | — |
+| 6 | #197 | Cloud Run /health: add dependency checks for Firestore + LiveKit | — |
+| 7 | #198 | scripts/seed-demo.ts: set Director credits + create demo session | — |
+| 8 | #199 | Director lobby: pre-flight status bar (Firebase, Cloud Run, LiveKit) | — |
+| 9 | #200 | E2E session chain smoke test: auth → session/start → LiveKit token | — |
+| 10 | #180 | Apple JWS receipt verification | #85 (Apple Dev, deferred) |
+
+Issues #187–#191 and #197–#200 are all unblocked. The loop will work through them in order, one per iteration.
+
+---
+
 ## Loop start command
 
 To begin a new Ralph Loop iteration, run:

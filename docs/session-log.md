@@ -46,3 +46,11 @@
 2026-06-09 | #94 iso-camera-reconnect | PR https://github.com/Masta-C/genstadium/pull/170 | NOTE: listEgress idempotency check by egressId match; Egress B restart failure non-fatal; lobby joins ignored
 2026-06-09 | #9 eas-config | PR https://github.com/Masta-C/genstadium/pull/171 | NOTE: owner=masta-c (verify); USE_EMULATOR env var replaces __DEV__ guard in firebase client
 2026-06-09 | #68 youtube-oauth | PR https://github.com/Masta-C/genstadium/pull/172 | NOTE: expo-auth-session OAuth; stream key from liveStreams.list cdn.ingestionInfo.streamName; lobby nav updated live-setup→youtube
+2026-06-09 | #10 production-deploy | PR https://github.com/Masta-C/genstadium/pull/173 | NOTE: deploy job uses environment:production gate; gcloud run deploy --source for Cloud Run; EXPO_TOKEN secret required for EAS
+2026-06-09 | #52 graphics-firebase-hosting | PR https://github.com/Masta-C/genstadium/pull/174 | NOTE: multi-site target 'graphics'→site 'genstadium-graphics'; custom domain needs manual Firebase Console setup
+2026-06-09 | #175 hardened-ci | PR https://github.com/Masta-C/genstadium/pull/181 | NOTE: real coverage baseline 52.8%/46.1% (not 95%); collectCoverageFrom reveals uncovered files; thresholds at baseline-3
+2026-06-09 | #176 app-baseline-tests | PR https://github.com/Masta-C/genstadium/pull/182 | NOTE: nativewind/babel returns preset-object not plugin — NODE_ENV=test guard needed; jest-expo caller.name=metro not babel-jest
+2026-06-09 | #177 graphics-baseline-tests | PR https://github.com/Masta-C/genstadium/pull/183 | NOTE: vitest globals:true needed; vitest/globals in tsconfig types; vi.stubGlobal for window.location; remotion needs full mock
+2026-06-09 | #178 cloud-run-integration-tests | PR https://github.com/Masta-C/genstadium/pull/184 | NOTE: emulator needs Java 21; local validation requires npm run emulators; not added to CI per spec
+2026-06-09 | #179 npm-audit-triage | PR https://github.com/Masta-C/genstadium/pull/185 | NOTE: all 17 HIGH/CRIT are build-time or dev-tool; continue-on-error stays until human reviews audit-accepted.md
+2026-06-09 | audit-gate-enabled | PR https://github.com/Masta-C/genstadium/pull/186 | NOTE: gate is --audit-level=critical --omit=dev (not high); HIGH gate needs expo@56+firebase@12 to unblock

@@ -12,10 +12,32 @@
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "genstadium-2321",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "genstadium-2321.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "genstadium-2321.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "46093505832",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:46093505832:android:8c75882ab4a189a843ac1d",
+        "EXPO_PUBLIC_CLOUD_RUN_URL": "https://genstadium-cloud-run-46093505832.asia-south1.run.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "46093505832-9u0cs17ine2mujokbtd3skm7kqrhh3vs.apps.googleusercontent.com",
+        "EXPO_PUBLIC_USE_EMULATOR": "false",
+        "EXPO_PUBLIC_IAP_PRODUCT_ID": "com.genstadium.app.credits_5"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "genstadium-2321",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "genstadium-2321.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "genstadium-2321.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "46093505832",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:46093505832:android:8c75882ab4a189a843ac1d",
+        "EXPO_PUBLIC_CLOUD_RUN_URL": "https://genstadium-cloud-run-46093505832.asia-south1.run.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "46093505832-9u0cs17ine2mujokbtd3skm7kqrhh3vs.apps.googleusercontent.com",
+        "EXPO_PUBLIC_USE_EMULATOR": "false",
+        "EXPO_PUBLIC_IAP_PRODUCT_ID": "com.genstadium.app.credits_5"
+      }
     }
   },
   "submit": {
