@@ -58,3 +58,4 @@
 2026-06-10 | #188 functions-deploy | PR https://github.com/Masta-C/genstadium/pull/202 | NOTE: build step required (dist/index.js entry); ordered after Firestore indexes before Cloud Run
 2026-06-10 | #189 wire-overcomplete-modal | PR https://github.com/Masta-C/genstadium/pull/203 | NOTE: cricketStateRef needs per-ball act() wraps in tests; import/first lint requires imports before jest.mock() even though babel hoists mocks
 2026-06-10 | #190 qa-demo-plan | PR https://github.com/Masta-C/genstadium/pull/204 | NOTE: workarounds for credits=0 and Google Sign-In SHA-1 documented; Cloud Functions deploy is the key prerequisite for replay flow
+2026-06-10 | #191 smoke-test | PR https://github.com/Masta-C/genstadium/pull/205 | NOTE: checks run in parallel; /health degrades gracefully with warning not failure; E2E auth chain in #200
