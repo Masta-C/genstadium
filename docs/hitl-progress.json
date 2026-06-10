@@ -88,10 +88,78 @@
       "issue": "#85",
       "title": "App Store Connect: create IAP product for credit pack + sandbox test account",
       "phase": 2,
+      "status": "deferred",
+      "completed_at": null,
+      "notes": "Deferred — requires Apple Developer enrollment ($99). Do after Android demo is validated.",
+      "task_file": "09-appstore.md"
+    },
+    {
+      "id": "google-services-refresh",
+      "issue": "#192",
+      "title": "Re-download google-services.json — debug SHA-1 not reflected in current file",
+      "phase": 3,
       "status": "pending",
       "completed_at": null,
-      "notes": "",
-      "task_file": "09-appstore.md"
+      "notes": "Current file has no android OAuth clients despite debug SHA-1 being registered. File was downloaded before SHA-1 was added. Google Sign-In broken on all builds until fixed.",
+      "depends_on": [],
+      "task_file": "10-google-services-refresh.md",
+      "github_issue": "https://github.com/Masta-C/genstadium/issues/192",
+      "estimated_time": "5 min"
+    },
+    {
+      "id": "cloud-run-env-verify",
+      "issue": "#193",
+      "title": "Verify Cloud Run env vars are set in GCP console",
+      "phase": 3,
+      "status": "pending",
+      "completed_at": null,
+      "notes": "Cloud Run service exists but env vars (LIVEKIT_API_KEY, LIVEKIT_API_SECRET, DVR_BUCKET etc.) must be explicitly set on the service — GitHub secrets do not auto-populate Cloud Run. Without this, every backend call fails.",
+      "depends_on": [],
+      "task_file": "11-cloud-run-env-verify.md",
+      "github_issue": "https://github.com/Masta-C/genstadium/issues/193",
+      "estimated_time": "10 min"
+    },
+    {
+      "id": "eas-first-build",
+      "issue": "#194",
+      "title": "EAS login + set Firebase API key secret + run first Android preview build",
+      "phase": 3,
+      "status": "pending",
+      "completed_at": null,
+      "notes": "No EAS build has ever been run. Requires: (1) agent issue #187 merged first (eas.json env vars), (2) google-services-refresh done, (3) eas login + eas env:create for FIREBASE_API_KEY + eas build --platform android --profile preview.",
+      "depends_on": ["google-services-refresh", "agent-issue-187"],
+      "task_file": "12-eas-first-build.md",
+      "github_issue": "https://github.com/Masta-C/genstadium/issues/194",
+      "estimated_time": "20 min"
+    },
+    {
+      "id": "eas-sha1-firebase",
+      "issue": "#195",
+      "title": "After first EAS build: extract SHA-1, register in Firebase, re-download google-services.json",
+      "phase": 3,
+      "status": "pending",
+      "completed_at": null,
+      "notes": "EAS uses its own managed keystore — different SHA-1 from debug. Must be registered in Firebase for Google Sign-In to work on EAS-built APKs. Then re-download google-services.json and rebuild.",
+      "depends_on": ["eas-first-build"],
+      "task_file": "13-eas-sha1-firebase.md",
+      "github_issue": "https://github.com/Masta-C/genstadium/issues/195",
+      "estimated_time": "10 min"
+    },
+    {
+      "id": "production-deploy-first",
+      "issue": "#196",
+      "title": "First production deploy: merge develop → main",
+      "phase": 3,
+      "status": "pending",
+      "completed_at": null,
+      "notes": "Deploys Cloud Functions (scoreStateAggregator + replayPrefetchTrigger), Firestore rules, Firebase Hosting (graphics scorebug), Cloud Run latest code. Requires agent issues #187 + #188 merged to develop first AND cloud-run-env-verify done.",
+      "depends_on": ["cloud-run-env-verify", "agent-issue-187", "agent-issue-188"],
+      "task_file": "14-production-deploy-first.md",
+      "github_issue": "https://github.com/Masta-C/genstadium/issues/196",
+      "estimated_time": "15 min"
     }
-  ]
+  ],
+  "next_hitl": "google-services-refresh",
+  "hitl_sequence_note": "Do google-services-refresh and cloud-run-env-verify in parallel (both independent). Then eas-first-build. Then eas-sha1-firebase. Then production-deploy-first last (needs all agent issues merged to develop).",
+  "last_updated": "2026-06-10"
 }

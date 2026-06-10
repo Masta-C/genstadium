@@ -12,11 +12,15 @@ import {
 // ---------------------------------------------------------------------------
 // Firebase config — values injected from Expo public env vars at build time
 // ---------------------------------------------------------------------------
+// NOTE: EXPO_PUBLIC_FIREBASE_API_KEY must be set as an EAS secret for preview/production builds.
+// Run: eas env:create --scope project --name EXPO_PUBLIC_FIREBASE_API_KEY --value "<web-api-key>" --environment preview
+// Web API key is in Firebase Console → Project Settings → General → Web API Key.
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '',
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '',
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? 'genstadium-2321',
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '',
+  // Use firebasestorage.app domain (new Firebase Storage URL format, not appspot.com)
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? 'genstadium-2321.firebasestorage.app',
   messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '',
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? '',
 }
