@@ -56,3 +56,4 @@
 2026-06-09 | audit-gate-enabled | PR https://github.com/Masta-C/genstadium/pull/186 | NOTE: gate is --audit-level=critical --omit=dev (not high); HIGH gate needs expo@56+firebase@12 to unblock
 2026-06-10 | #187 eas-preview-env-vars | PR https://github.com/Masta-C/genstadium/pull/201 | NOTE: EXPO_PUBLIC_FIREBASE_API_KEY must be set via eas env:create separately; storage bucket is firebasestorage.app not appspot.com
 2026-06-10 | #188 functions-deploy | PR https://github.com/Masta-C/genstadium/pull/202 | NOTE: build step required (dist/index.js entry); ordered after Firestore indexes before Cloud Run
+2026-06-10 | #189 wire-overcomplete-modal | PR https://github.com/Masta-C/genstadium/pull/203 | NOTE: cricketStateRef needs per-ball act() wraps in tests; import/first lint requires imports before jest.mock() even though babel hoists mocks
