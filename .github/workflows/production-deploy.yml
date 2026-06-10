@@ -97,11 +97,22 @@ jobs:
           VITE_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_PROJECT_ID }}.firebaseapp.com
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_PROJECT_ID }}.appspot.com
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_PROJECT_ID }}.firebasestorage.app
 
       # ── Firebase Hosting (graphics) + Firestore rules + indexes ─────────────
       - name: Deploy Firebase (Hosting + Firestore rules + indexes)
         run: npx firebase deploy --only hosting:graphics,firestore:rules,firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }}
+
+      # ── Cloud Functions ──────────────────────────────────────────────────────
+      # Must run after Firestore indexes deploy — functions may query indexed paths.
+      # scoreStateAggregator: aggregates score events → writes scoreState (only writer)
+      # replayPrefetchTrigger: fires Cloud Run /replay/prefetch on prefetch events
+      - name: Deploy Cloud Functions
+        run: |
+          npm run build --workspace=@genstadium/functions
+          npx firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID }}
+        env:
+          CLOUD_RUN_URL: https://genstadium-cloud-run-46093505832.asia-south1.run.app
 
       # ── Cloud Run ────────────────────────────────────────────────────────────
       - name: Deploy Cloud Run
