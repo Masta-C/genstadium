@@ -10,7 +10,10 @@ import { OverCompleteModal } from '../OverCompleteModal'
 jest.mock('react-native/Libraries/Modal/Modal', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { View } = require('react-native')
-  return ({ children }: { children: React.ReactNode }) => <View>{children}</View>
+  function ModalMock({ children }: { children: React.ReactNode }) {
+    return <View>{children}</View>
+  }
+  return ModalMock
 })
 
 const BOWLERS = [

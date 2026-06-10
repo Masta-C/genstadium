@@ -4,9 +4,14 @@
  * Tests countLegalDelivery (via ref) + OverCompleteModal wiring.
  * Firestore and EventButtons are mocked — no real network calls.
  */
+// import/first: all imports must precede jest.mock() calls in source.
+// jest.mock() is hoisted by babel-jest at compile time, so execution order is correct.
 import React, { createRef, act } from 'react'
 import { create } from 'react-test-renderer'
 import { Animated } from 'react-native'
+import { onSnapshot, updateDoc } from 'firebase/firestore'
+import { CricketPanel, CricketPanelRef } from '../CricketPanel'
+import { OverCompleteModal } from '../OverCompleteModal'
 
 // ── Mock Firebase ──────────────────────────────────────────────────────────────
 jest.mock('../../lib/firebase/client', () => ({ db: {} }))
@@ -31,10 +36,6 @@ jest.mock('../EventButtons', () => ({
   },
 }))
 
-// ── Import after mocks ─────────────────────────────────────────────────────────
-import { onSnapshot, updateDoc } from 'firebase/firestore'
-import { CricketPanel, CricketPanelRef } from '../CricketPanel'
-import { OverCompleteModal } from '../OverCompleteModal'
 
 const TEAMS = [
   { id: 'team-a', name: 'India', colour: '#1DB954' },
