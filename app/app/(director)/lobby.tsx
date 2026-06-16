@@ -23,6 +23,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { ServiceStatusBar } from '../../components/ServiceStatusBar'
+import { useServiceHealth } from '../../hooks/useServiceHealth'
 import { db } from '../../lib/firebase/client'
 
 const JOIN_BASE_URL = 'https://genstadium.com/join'
@@ -49,6 +51,7 @@ interface Session {
 
 export default function LobbyScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>()
+  const serviceHealth = useServiceHealth()
   const [session, setSession] = useState<Session | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [loading, setLoading] = useState(true)
@@ -151,6 +154,9 @@ export default function LobbyScreen() {
           <Text style={styles.joinCode}>{session.joinCode}</Text>
         </View>
       </View>
+
+      {/* Pre-flight service status — informational only, does not block Go Live */}
+      <ServiceStatusBar health={serviceHealth} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {/* Camera Slots section */}
