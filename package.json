@@ -15,7 +15,8 @@
     "emulators": "firebase emulators:start --import=./emulator-data --export-on-exit",
     "emulators:clean": "firebase emulators:start",
     "seed": "FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIRESTORE_EMULATOR_HOST=localhost:8080 npx ts-node --esm scripts/seed-auth.ts && FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIRESTORE_EMULATOR_HOST=localhost:8080 npx ts-node --esm scripts/seed.ts",
-    "smoke-test": "npx ts-node --esm scripts/smoke-test.ts"
+    "smoke-test": "npx ts-node --esm scripts/smoke-test.ts",
+    "seed:demo": "ts-node --esm scripts/seed-demo.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
